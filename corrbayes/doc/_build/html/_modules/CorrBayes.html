@@ -1,0 +1,492 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>CorrBayes &#8212; CorrBayes 0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for CorrBayes</h1><div class="highlight"><pre>
+<span></span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="k">import</span> <span class="n">array</span>
+
+<span class="kn">from</span> <span class="nn">gvar</span> <span class="k">import</span> <span class="n">log</span><span class="p">,</span><span class="n">exp</span><span class="p">,</span><span class="n">evalcov</span><span class="p">,</span><span class="n">sqrt</span>
+<span class="kn">from</span> <span class="nn">gvar.dataset</span> <span class="k">import</span> <span class="n">Dataset</span><span class="p">,</span><span class="n">avg_data</span>
+<span class="kn">import</span> <span class="nn">gvar</span> <span class="k">as</span> <span class="nn">gv</span>
+
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="k">import</span> <span class="n">isnan</span>
+
+
+<div class="viewcode-block" id="invertosc"><a class="viewcode-back" href="../func.html#CorrBayes.invertosc">[docs]</a><span class="k">def</span> <span class="nf">invertosc</span><span class="p">(</span><span class="n">c</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Swaps effect of oscillating and non-oscillating states in correlator &quot;c&quot; using the operation</span>
+<span class="sd">    C(t) -&gt; (-1)^t C(t).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">**</span><span class="p">(</span><span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span><span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="p">))</span> <span class="p">]</span></div>
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="superav"><a class="viewcode-back" href="../func.html#CorrBayes.superav">[docs]</a><span class="k">def</span> <span class="nf">superav</span><span class="p">(</span><span class="n">c</span><span class="p">,</span><span class="n">n</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Performs superaveraging operation on correlator &quot;c&quot; n times.</span>
+<span class="sd">    The superaverage operator does this</span>
+<span class="sd">     C(t) -&gt; ( C(t)+C(t+1) ) / 2.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="p">[</span> <span class="p">(</span><span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="p">]</span><span class="o">+</span><span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">])</span><span class="o">/</span><span class="mi">2</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="k">return</span> <span class="n">c</span></div>
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="superav2"><a class="viewcode-back" href="../func.html#CorrBayes.superav2">[docs]</a><span class="k">def</span> <span class="nf">superav2</span><span class="p">(</span><span class="n">c</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Asymmetric second-order superaverage of correlator &quot;c&quot;;</span>
+<span class="sd">     C(t) -&gt; ( C(t-1) - 2C(t) + C(t+1) ) / 4 .</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="p">]</span><span class="o">+</span><span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="o">+</span><span class="mi">2</span><span class="p">])</span><span class="o">/</span><span class="mi">4</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="p">)</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="p">]</span></div>
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="effective_mass"><a class="viewcode-back" href="../func.html#CorrBayes.effective_mass">[docs]</a><span class="k">def</span> <span class="nf">effective_mass</span><span class="p">(</span><span class="n">c</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns effective mass of correlator &quot;c&quot;</span>
+<span class="sd">     m_{eff}(t) = log( C(t) / C(t+1) ).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span> <span class="n">log</span><span class="p">(</span> <span class="n">sqrt</span><span class="p">(</span> <span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="p">]</span><span class="o">/</span><span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span> <span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span></div>
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="effective_amp"><a class="viewcode-back" href="../func.html#CorrBayes.effective_amp">[docs]</a><span class="k">def</span> <span class="nf">effective_amp</span><span class="p">(</span><span class="n">c</span><span class="p">):</span> 
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns effective amplitude</span>
+<span class="sd">    a_{eff}(t) = sqrt( C(t) * exp( m_{eff}(t) * t ) )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">m</span><span class="o">=</span><span class="n">effective_mass</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">[</span> <span class="n">sqrt</span><span class="p">(</span> <span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">*</span> <span class="n">exp</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="n">t</span><span class="p">]</span><span class="o">*</span><span class="n">t</span><span class="p">)</span> <span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="p">]</span></div>
+<span class="c1">##</span>
+
+<div class="viewcode-block" id="amp_superav"><a class="viewcode-back" href="../func.html#CorrBayes.amp_superav">[docs]</a><span class="k">def</span> <span class="nf">amp_superav</span><span class="p">(</span><span class="n">c</span><span class="p">):</span> 
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Takes superaverage of correlator c, then effective amplitude,</span>
+<span class="sd">    then applies a correction factor sqrt( 2 / 1 + e^{-m_{eff}(t)} ).</span>
+
+<span class="sd">    This is because taking the superaverage shifts the effective amplitude of a correlator,</span>
+<span class="sd">    this correction cancels that shift.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">superav</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+    <span class="n">m</span><span class="o">=</span><span class="n">effective_mass</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">[</span> <span class="n">sqrt</span><span class="p">(</span> <span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">*</span> <span class="n">exp</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="n">t</span><span class="p">]</span><span class="o">*</span><span class="n">t</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span><span class="o">+</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">m</span><span class="p">[</span><span class="n">t</span><span class="p">]))</span> <span class="p">)</span>  <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="p">]</span></div>
+<span class="c1">##</span>
+
+<div class="viewcode-block" id="amp_superav2"><a class="viewcode-back" href="../func.html#CorrBayes.amp_superav2">[docs]</a><span class="k">def</span> <span class="nf">amp_superav2</span><span class="p">(</span><span class="n">c</span><span class="p">):</span> 
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Takes superaverage of correlator c, then effective amplitude,</span>
+<span class="sd">    then applies a correction factor sqrt( 4 / 1 + cosh(m_{eff}(t)) ).</span>
+
+<span class="sd">    This is because taking the superaverage shifts the effective amplitude of a correlator,</span>
+<span class="sd">    this correction cancels that shift.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">superav2</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">effective_mass</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">[</span> <span class="n">sqrt</span><span class="p">(</span> <span class="n">c</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">*</span> <span class="n">exp</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="n">t</span><span class="p">]</span><span class="o">*</span><span class="n">t</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span><span class="o">+</span><span class="p">(</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">m</span><span class="p">[</span><span class="n">t</span><span class="p">])</span><span class="o">+</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="o">*</span><span class="n">m</span><span class="p">[</span><span class="n">t</span><span class="p">]))</span><span class="o">/</span><span class="mi">2</span> <span class="p">)</span> <span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="p">)</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="p">]</span></div>
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="ratio"><a class="viewcode-back" href="../func.html#CorrBayes.ratio">[docs]</a><span class="k">def</span> <span class="nf">ratio</span><span class="p">(</span><span class="n">C3</span><span class="p">,</span> <span class="n">C2_1</span><span class="p">,</span> <span class="n">C2_2</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Takes a 3-point correlator C3 and two 2-point correlators C2_1,C2_2, returns the ratio</span>
+
+<span class="sd">    R = C_{3pt}(t)/ ( C_{2pt,1}(t) * C_{2pt,2}(T-t) )</span>
+
+<span class="sd">    where T is the source/sink temporal separation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">T</span> <span class="o">=</span> <span class="n">C3</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">C3</span><span class="p">[</span><span class="n">t</span><span class="p">]</span><span class="o">/</span><span class="p">(</span><span class="n">C2_1</span><span class="p">[</span><span class="n">T</span><span class="o">-</span><span class="n">t</span><span class="p">]</span><span class="o">*</span><span class="n">C2_2</span><span class="p">[</span><span class="n">t</span><span class="p">])</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">T</span><span class="p">)]</span></div>
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="safelog"><a class="viewcode-back" href="../func.html#CorrBayes.safelog">[docs]</a><span class="k">def</span> <span class="nf">safelog</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Takes in gvar x, returns log(x). If x not suitable for log, returns log(1.0(9)).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">logx</span> <span class="o">=</span> <span class="n">log</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">isnan</span><span class="p">(</span><span class="n">logx</span><span class="o">.</span><span class="n">mean</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;CorrBayes.safelog WARNING: invalid argument for log - replacing with log(1.0(9))&#39;</span>
+        <span class="k">return</span> <span class="n">log</span><span class="p">(</span><span class="n">gv</span><span class="o">.</span><span class="n">gvar</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span><span class="mf">0.9</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span> <span class="k">return</span> <span class="n">logx</span></div>
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="dirtyfit"><a class="viewcode-back" href="../func.html#CorrBayes.dirtyfit">[docs]</a><span class="k">def</span> <span class="nf">dirtyfit</span><span class="p">(</span><span class="n">correlator</span><span class="p">,</span>
+             <span class="n">nexp</span><span class="p">,</span>
+             <span class="n">key</span><span class="p">,</span>
+
+             <span class="n">tcut</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+             <span class="n">loosener</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+             <span class="n">zero_buffer</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+
+             <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span>
+          <span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Takes in single correlator and associated key,</span>
+<span class="sd">    returns dictionary of best guesses for correlator parameters.</span>
+
+<span class="sd">    Requires data keys of the format &quot;meson.ss&quot;, where &quot;meson&quot; labels the meson,</span>
+<span class="sd">    and the &quot;s&quot;&#39;s labels the source/sink combination,</span>
+<span class="sd">    e.g. etac.ll is a local-local eta_c correlator.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;Performing dirty fit on correlator&#39;</span><span class="p">,</span><span class="n">key</span>
+
+    <span class="n">Tlat</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">correlator</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">tcut</span><span class="p">:</span> 
+        <span class="n">tcut</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">Tlat</span><span class="o">/</span><span class="mf">10.</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;tcut set to &#39;</span><span class="p">,</span><span class="n">tcut</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">loosener</span><span class="p">:</span> <span class="n">loosener</span><span class="o">=</span><span class="mf">0.3</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">zero_buffer</span><span class="p">:</span> <span class="n">zero_buffer</span><span class="o">=</span><span class="mf">0.3</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">gv</span><span class="o">.</span><span class="n">BufferDict</span><span class="p">()</span>
+
+    <span class="c1"># finding ground state energy</span>
+    <span class="n">mass</span> <span class="o">=</span> <span class="n">avg_data</span><span class="p">(</span>
+        <span class="n">effective_mass</span><span class="p">(</span> <span class="n">superav2</span><span class="p">(</span><span class="n">correlator</span><span class="p">)</span> <span class="p">)[</span><span class="n">tcut</span><span class="p">:</span><span class="nb">int</span><span class="p">(</span><span class="n">Tlat</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">-</span><span class="n">tcut</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">*</span> <span class="n">gv</span><span class="o">.</span><span class="n">gvar</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">loosener</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;mass = &#39;</span><span class="p">,</span><span class="n">mass</span>
+
+    <span class="c1"># finding ground state amplitude</span>
+    <span class="n">amp</span> <span class="o">=</span> <span class="n">avg_data</span><span class="p">(</span>
+        <span class="n">amp_superav2</span><span class="p">(</span><span class="n">correlator</span><span class="p">)[</span><span class="n">tcut</span><span class="p">:</span><span class="nb">int</span><span class="p">(</span><span class="n">Tlat</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">-</span><span class="n">tcut</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">*</span> <span class="n">gv</span><span class="o">.</span><span class="n">gvar</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">loosener</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;amplitude = &#39;</span><span class="p">,</span><span class="n">amp</span>
+
+    <span class="c1"># &#39;excited_correlator&#39; = correlators with ground state term removed</span>
+    <span class="n">excited_correlator</span> <span class="o">=</span> <span class="p">[</span> <span class="n">correlator</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">-</span> <span class="n">amp</span><span class="o">*</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">mass</span><span class="o">*</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">Tlat</span><span class="p">)</span> <span class="p">]</span>
+
+    <span class="c1"># finding first excited energy</span>
+    <span class="n">spectrum</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span>
+        <span class="n">effective_mass</span><span class="p">(</span> <span class="n">superav2</span><span class="p">(</span><span class="n">excited_correlator</span><span class="p">)</span> <span class="p">)[</span> <span class="n">tcut</span> <span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">Tlat</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">-</span><span class="n">tcut</span> <span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">spectrum</span> <span class="o">=</span> <span class="n">gv</span><span class="o">.</span><span class="n">gvar</span><span class="p">(</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">mean</span><span class="p">,</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">mean</span> <span class="o">-</span> <span class="n">zero_buffer</span> <span class="p">)</span>
+
+    <span class="c1"># finding first excited state amplitude</span>
+    <span class="n">spectrum_amps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span>
+        <span class="n">amp_superav2</span><span class="p">(</span> <span class="n">excited_correlator</span> <span class="p">)[</span> <span class="n">tcut</span> <span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">Tlat</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">-</span><span class="n">tcut</span> <span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">spectrum_amps</span> <span class="o">=</span> <span class="n">gv</span><span class="o">.</span><span class="n">gvar</span><span class="p">(</span> <span class="n">spectrum_amps</span><span class="o">.</span><span class="n">mean</span><span class="p">,</span> <span class="n">spectrum_amps</span><span class="o">.</span><span class="n">mean</span> <span class="o">-</span> <span class="n">zero_buffer</span> <span class="p">)</span>
+
+    <span class="c1"># building key</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">meson</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;^(.*)\...$&#39;</span><span class="p">,</span><span class="n">key</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># M.ll -&gt; M</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># M.ll -&gt; l</span>
+    <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+        <span class="nb">print</span> <span class="s1">&#39;The key&#39;</span><span class="p">,</span><span class="n">key</span><span class="p">,</span><span class="s1">&#39;is in the wrong format, it must look like M.ll&#39;</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;found meson label = &#39;</span><span class="p">,</span><span class="n">meson</span><span class="p">,</span><span class="s1">&#39;, source label = &#39;</span><span class="p">,</span><span class="n">source</span>
+
+    <span class="c1"># building dictionary of results</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;log&#39;</span><span class="o">+</span><span class="n">meson</span><span class="o">+</span><span class="s1">&#39;:a&#39;</span><span class="o">+</span><span class="n">source</span><span class="p">,</span>
+               <span class="p">[</span> <span class="n">safelog</span><span class="p">(</span><span class="n">spectrum_amps</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nexp</span><span class="p">)</span> <span class="p">])</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;logdE:&#39;</span><span class="o">+</span><span class="n">meson</span><span class="p">,</span>
+               <span class="p">[</span> <span class="n">safelog</span><span class="p">(</span><span class="n">spectrum</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nexp</span><span class="p">)</span> <span class="p">])</span>
+
+    <span class="n">result</span><span class="p">[</span><span class="s1">&#39;log&#39;</span><span class="o">+</span><span class="n">meson</span><span class="o">+</span><span class="s1">&#39;:a&#39;</span><span class="o">+</span><span class="n">source</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">safelog</span><span class="p">(</span><span class="n">amp</span><span class="p">)</span>
+    <span class="n">result</span><span class="p">[</span><span class="s1">&#39;logdE:&#39;</span><span class="o">+</span><span class="n">meson</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">safelog</span><span class="p">(</span><span class="n">mass</span><span class="p">)</span>
+
+    <span class="c1"># making guesses for oscillating states -</span>
+    <span class="c1"># ground state amplitudes smaller and ground state energies larger than non-oscillating</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;logo&#39;</span><span class="o">+</span><span class="n">meson</span><span class="o">+</span><span class="s1">&#39;:a&#39;</span><span class="o">+</span><span class="n">source</span><span class="p">,</span>
+               <span class="p">[</span><span class="n">safelog</span><span class="p">(</span> <span class="n">gv</span><span class="o">.</span><span class="n">gvar</span><span class="p">(</span> <span class="n">amp</span><span class="o">.</span><span class="n">mean</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">amp</span><span class="o">.</span><span class="n">mean</span> <span class="p">)</span> <span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nexp</span><span class="p">)]</span> <span class="p">)</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;logdE:o&#39;</span><span class="o">+</span><span class="n">meson</span><span class="p">,</span>
+               <span class="p">[</span><span class="n">safelog</span><span class="p">(</span><span class="n">spectrum</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nexp</span><span class="p">)]</span> <span class="p">)</span>
+
+    <span class="n">result</span><span class="p">[</span><span class="s1">&#39;logdE:o&#39;</span><span class="o">+</span><span class="n">meson</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">safelog</span><span class="p">(</span> <span class="n">gv</span><span class="o">.</span><span class="n">gvar</span><span class="p">(</span> <span class="n">mass</span><span class="o">.</span><span class="n">mean</span><span class="o">*</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">mass</span><span class="o">.</span><span class="n">mean</span> <span class="p">)</span> <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;result = &#39;</span><span class="p">,</span><span class="n">result</span>
+
+    <span class="k">return</span> <span class="n">gv</span><span class="o">.</span><span class="n">add_parameter_parentheses</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
+<span class="c1">##</span>
+
+
+<div class="viewcode-block" id="dirtyfit_3pt"><a class="viewcode-back" href="../func.html#CorrBayes.dirtyfit_3pt">[docs]</a><span class="k">def</span> <span class="nf">dirtyfit_3pt</span><span class="p">(</span><span class="n">cdict</span><span class="p">,</span>
+                 <span class="n">nexp</span><span class="p">,</span>
+                 <span class="n">key</span><span class="p">,</span>
+                 <span class="n">current</span><span class="p">,</span>
+
+                 <span class="n">tcut_3pt</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">tcut_2pt</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">loosener</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
+
+                 <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span>
+              <span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Takes in a dictionary of correlators, the key for a 3-point correlator and the name of the current,</span>
+<span class="sd">    produces a dirty estimate of the 3-point transition amplitude by taking the ratio</span>
+
+<span class="sd">    R = C_{3pt}(t)/ C_{2pt,1}(t) * C_{2pt,2}(T-t),</span>
+
+<span class="sd">    where the C_{2pt,1/2} are the correlators for the two states on either side of the current.</span>
+<span class="sd">    t is the timeslice of the current and T is the source/sink temporal separation.</span>
+
+<span class="sd">    This ratio is equal to J/a1*a2, where J is the transition amplitude and a1/2 are the amplitudes</span>
+<span class="sd">    of the 2-point correlators. Then we find J = R * a1 * a2.</span>
+
+<span class="sd">    Requires 2-point data keys of the format &quot;meson.ss&quot;, where &quot;meson&quot; labels the meson,</span>
+<span class="sd">    and the &quot;s&quot;&#39;s labels the source/sink combination,</span>
+<span class="sd">    e.g. etac.ll is a local-local eta_c correlator.</span>
+
+<span class="sd">    Requires 3-point data keys of the format &quot;meson1.J.meson2_T{T}.ss&quot;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;Performing dirty fit on correlator&#39;</span><span class="p">,</span><span class="n">key</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">loosener</span><span class="p">:</span> <span class="n">loosener</span><span class="o">=</span><span class="mf">0.3</span>
+
+    <span class="c1"># fetching labels</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">tag</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;^(.*)_T\d\d?\...$&#39;</span><span class="p">,</span><span class="n">key</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># M1.J.M2_T{T}.ll -&gt; M1.J.M2</span>
+        <span class="n">meson1</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;^(.*)\.&#39;</span><span class="o">+</span><span class="n">current</span><span class="p">,</span><span class="n">key</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># M1.J.M2_T{T}.ll -&gt; M1</span>
+        <span class="n">meson2</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">current</span><span class="o">+</span><span class="s1">&#39;\.(.*)_T\d\d?\...$&#39;</span><span class="p">,</span><span class="n">key</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># M1.J.M2_T{T}.ll -&gt; M2</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># M1.J.M2_T{T}.ll -&gt; l</span>
+    <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+        <span class="nb">print</span> <span class="s1">&#39;The key&#39;</span><span class="p">,</span><span class="n">key</span><span class="p">,</span><span class="s1">&#39;is in the wrong format, it must look like M1.J.M2_T</span><span class="si">{T}</span><span class="s1">.ll&#39;</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">T</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;_T(\d\d?)\.&#39;</span><span class="p">,</span><span class="n">key</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="p">)</span> <span class="c1"># M1.J.M2_T{T}.ll -&gt; {T}</span>
+
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+        <span class="nb">print</span> <span class="s1">&#39;found meson labels =&#39;</span><span class="p">,</span><span class="n">meson1</span><span class="p">,</span><span class="s1">&#39;,&#39;</span><span class="p">,</span><span class="n">meson2</span><span class="p">,</span><span class="s1">&#39;, sources =&#39;</span><span class="p">,</span><span class="n">source</span>
+        <span class="nb">print</span> <span class="s1">&#39;found T =&#39;</span><span class="p">,</span><span class="n">T</span>
+
+    <span class="n">c3</span> <span class="o">=</span> <span class="n">cdict</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">tcut_3pt</span><span class="p">:</span> 
+        <span class="n">tcut_3pt</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">T</span><span class="o">/</span><span class="mf">3.</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;tcut_3pt set to&#39;</span><span class="p">,</span><span class="n">tcut_3pt</span>
+
+    <span class="n">c2</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">amp</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">meson</span> <span class="ow">in</span> <span class="p">[</span><span class="n">meson1</span><span class="p">,</span><span class="n">meson2</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;finding amplitude for&#39;</span><span class="p">,</span><span class="n">meson</span><span class="p">,</span><span class="s1">&#39;...&#39;</span>
+
+        <span class="c1"># finding corresponding 2point correlators</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">c2</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="n">cdict</span><span class="p">[</span><span class="n">meson</span><span class="o">+</span><span class="s1">&#39;.&#39;</span><span class="o">+</span><span class="n">source</span><span class="o">+</span><span class="n">source</span><span class="p">]</span> <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="nb">print</span> <span class="s1">&#39;cannot find correlator for&#39;</span><span class="p">,</span><span class="n">meson</span><span class="p">,</span><span class="s1">&#39;to go with&#39;</span><span class="p">,</span><span class="n">key</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">Tlat</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">c2</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">tcut_2pt</span><span class="p">:</span>
+            <span class="n">tcut_2pt</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">Tlat</span><span class="o">/</span><span class="mf">10.</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;tcut_2pt set to&#39;</span><span class="p">,</span><span class="n">tcut_2pt</span>
+
+        <span class="c1"># finding ground state amplitude of 2pt correlators</span>
+        <span class="n">amp</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">avg_data</span><span class="p">(</span>
+                <span class="n">amp_superav2</span><span class="p">(</span><span class="n">c2</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])[</span> <span class="n">tcut_2pt</span> <span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">Tlat</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">-</span><span class="n">tcut_2pt</span> <span class="p">]</span>
+            <span class="p">)</span> <span class="o">*</span> <span class="n">gv</span><span class="o">.</span><span class="n">gvar</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">loosener</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;amp =&#39;</span><span class="p">,</span><span class="n">amp</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="c1"># J = approximation of 3-point transition amplitude</span>
+    <span class="n">J</span> <span class="o">=</span> <span class="n">avg_data</span><span class="p">(</span>
+        <span class="n">superav2</span><span class="p">(</span> <span class="n">ratio</span><span class="p">(</span><span class="n">c3</span><span class="p">,</span><span class="n">c2</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">c2</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="p">)[</span> <span class="n">tcut_3pt</span> <span class="p">:</span> <span class="n">T</span><span class="o">-</span><span class="n">tcut_3pt</span> <span class="p">]</span>
+    <span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">product</span><span class="p">(</span><span class="n">amp</span><span class="p">)</span> <span class="o">*</span> <span class="n">gv</span><span class="o">.</span><span class="n">gvar</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">loosener</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;J =&#39;</span><span class="p">,</span><span class="n">J</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">gv</span><span class="o">.</span><span class="n">BufferDict</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">V</span> <span class="ow">in</span> <span class="p">[</span> <span class="s1">&#39;Vnn_&#39;</span><span class="p">,</span> <span class="s1">&#39;Von_&#39;</span><span class="p">,</span> <span class="s1">&#39;Vno_&#39;</span><span class="p">,</span> <span class="s1">&#39;Voo_&#39;</span> <span class="p">]:</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">add</span><span class="p">(</span> <span class="n">V</span><span class="o">+</span><span class="n">tag</span><span class="p">,</span>
+                    <span class="p">[</span> <span class="p">[</span><span class="n">gv</span><span class="o">.</span><span class="n">gvar</span><span class="p">(</span><span class="mf">0.01</span><span class="p">,</span><span class="mf">1.0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nexp</span><span class="p">)]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nexp</span><span class="p">)]</span> <span class="p">)</span>
+
+    <span class="n">result</span><span class="p">[</span><span class="s1">&#39;Vnn_&#39;</span><span class="o">+</span><span class="n">tag</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">J</span>
+
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;result =&#39;</span><span class="p">,</span><span class="n">result</span>
+
+    <span class="k">return</span> <span class="n">gv</span><span class="o">.</span><span class="n">add_parameter_parentheses</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
+<span class="c1">##</span>
+
+
+
+<div class="viewcode-block" id="get_prior"><a class="viewcode-back" href="../func.html#CorrBayes.get_prior">[docs]</a><span class="k">def</span> <span class="nf">get_prior</span><span class="p">(</span><span class="n">dset</span><span class="p">,</span>
+              <span class="n">Nsubset</span><span class="p">,</span>
+              <span class="n">nexp</span><span class="p">,</span>
+              <span class="n">currents</span><span class="o">=</span><span class="p">[],</span>
+
+              <span class="n">tcut_2pt</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+              <span class="n">tcut_3pt</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+              <span class="n">loosener</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+              <span class="n">zero_buffer</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+
+              <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span>
+          <span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Takes in a gvar.Dataset &quot;dset&quot;, shaves off &quot;Nsubset&quot; data points,</span>
+<span class="sd">    and uses those correlators to deduce priors for a fit of the correlators</span>
+<span class="sd">    in dset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">dset</span><span class="p">)</span><span class="o">==</span><span class="n">gv</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">Dataset</span>
+    <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">Nsubset</span><span class="p">)</span><span class="o">==</span><span class="nb">int</span> <span class="ow">and</span> <span class="n">Nsubset</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">nexp</span><span class="p">)</span><span class="o">==</span><span class="nb">int</span> <span class="ow">and</span> <span class="n">nexp</span> <span class="o">&gt;</span> <span class="mi">0</span>
+
+    <span class="c1"># pick out subset</span>
+
+    <span class="n">subset_index</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">dset</span><span class="p">[</span><span class="n">dset</span><span class="o">.</span><span class="n">keys</span><span class="p">()[</span><span class="mi">0</span><span class="p">]])),</span>
+                                  <span class="n">Nsubset</span> <span class="p">)</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;data point(s) selected for deducing prior:&#39;</span><span class="p">,</span><span class="n">subset_index</span>
+    <span class="n">subset</span> <span class="o">=</span> <span class="p">{</span> <span class="n">key</span> <span class="p">:</span>
+               <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span> <span class="p">[</span> <span class="n">dset</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="n">s</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">subset_index</span> <span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span> <span class="p">)</span>
+               <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">dset</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="p">}</span> <span class="c1"># averaged subset data</span>
+
+    <span class="c1"># removing subset from dataset</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span> <span class="s1">&#39;removing these points from dataset...&#39;</span>
+    <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">subset_index</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">dset</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">dset</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span> <span class="p">(</span> <span class="n">dset</span><span class="p">[</span><span class="n">key</span><span class="p">][:</span><span class="n">s</span><span class="p">],</span> <span class="n">dset</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="n">s</span><span class="o">+</span><span class="mi">1</span><span class="p">:]</span> <span class="p">)</span> <span class="p">)</span>
+
+
+    <span class="c1"># deduce priors from subset</span>
+
+    <span class="n">prior</span> <span class="o">=</span> <span class="n">gv</span><span class="o">.</span><span class="n">BufferDict</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">subset</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">subset</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+        <span class="c1"># see if this key corresponds to a 3pt correlator, and save current name</span>
+        <span class="k">for</span> <span class="n">current_i</span> <span class="ow">in</span> <span class="n">currents</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">current_i</span><span class="p">,</span><span class="n">key</span><span class="p">):</span>
+                <span class="n">this_current</span> <span class="o">=</span> <span class="n">current_i</span>
+
+        <span class="c1"># do single correlator fit</span>
+        <span class="k">if</span> <span class="s1">&#39;this_current&#39;</span> <span class="ow">in</span> <span class="nb">locals</span><span class="p">():</span>
+            <span class="n">cpriors</span> <span class="o">=</span> <span class="n">dirtyfit_3pt</span><span class="p">(</span> <span class="n">cdict</span> <span class="o">=</span> <span class="n">subset</span><span class="p">,</span>
+                                    <span class="n">nexp</span> <span class="o">=</span> <span class="n">nexp</span><span class="p">,</span>
+                                    <span class="n">key</span> <span class="o">=</span> <span class="n">key</span><span class="p">,</span>
+                                    <span class="n">current</span> <span class="o">=</span> <span class="n">this_current</span><span class="p">,</span>
+                                    <span class="n">tcut_3pt</span> <span class="o">=</span> <span class="n">tcut_3pt</span><span class="p">,</span>
+                                    <span class="n">tcut_2pt</span> <span class="o">=</span> <span class="n">tcut_2pt</span><span class="p">,</span>
+                                    <span class="n">loosener</span> <span class="o">=</span> <span class="n">loosener</span><span class="p">,</span>
+                                    <span class="n">verbose</span> <span class="o">=</span> <span class="n">verbose</span> <span class="p">)</span>
+
+            <span class="k">del</span> <span class="n">this_current</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cpriors</span> <span class="o">=</span> <span class="n">dirtyfit</span><span class="p">(</span> <span class="n">correlator</span> <span class="o">=</span> <span class="n">c</span><span class="p">,</span>
+                                <span class="n">nexp</span> <span class="o">=</span> <span class="n">nexp</span><span class="p">,</span>
+                                <span class="n">key</span> <span class="o">=</span> <span class="n">key</span><span class="p">,</span>
+                                <span class="n">tcut</span> <span class="o">=</span> <span class="n">tcut_2pt</span><span class="p">,</span>
+                                <span class="n">loosener</span> <span class="o">=</span> <span class="n">loosener</span><span class="p">,</span>
+                                <span class="n">zero_buffer</span> <span class="o">=</span> <span class="n">zero_buffer</span><span class="p">,</span>
+                                <span class="n">verbose</span> <span class="o">=</span> <span class="n">verbose</span> <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">cpriors</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span> <span class="n">prior</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">cpriors</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="p">(</span> <span class="n">prior</span><span class="p">,</span> <span class="n">dset</span> <span class="p">)</span></div>
+<span class="c1">##</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CorrBayes</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../details.html">More Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tagnaming.html">Tag Naming Convention</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../func.html">Function Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Euan McLean.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

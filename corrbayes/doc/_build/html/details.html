@@ -1,0 +1,149 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>More Details &#8212; CorrBayes 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Tag Naming Convention" href="tagnaming.html" />
+    <link rel="prev" title="Introduction" href="intro.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="more-details">
+<h1>More Details<a class="headerlink" href="#more-details" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="how-it-works">
+<h2>How it works<a class="headerlink" href="#how-it-works" title="Permalink to this headline">¶</a></h2>
+<p>Getting good priors from a single correlator is possible due to the nice properties of correlation functions in QCD.
+The effective mass of a single correlator gives a good estimate of the true mass for example. We first take the sacrificed correlator and perform a second-order superaverage</p>
+<p>C(t) -&gt; ( C(t-1) - 2C(t) + C(t+1) ) / 4</p>
+<p>This drowns out any effects from oscillating states in the case of staggered quarks. Then, the prior for the ground state energy is calculated via</p>
+<p>E_0 = [ mean over t=t_cut -&gt; t=T_lat/2-t_cut ] log( C(t) / C(t+1) )</p>
+<p>The variance of this is inflated by 30% (one can choose a custom amount using the optional argument “loosener”).
+t_cut is another optional argument, with a default of T_lat/10.</p>
+<p>Similarly, the ground state amplitude is given by</p>
+<p>a_0 = [ mean over t=t_cut -&gt; t=T_lat/2-t_cut ] sqrt( C(t) * e^{ E_0 t } ) * 30% additional error</p>
+<p>The excited state parameters are computed by transforming the correlator ( C(t) -&gt; C(t) - a_0^2 * exp( - E_0 t ) ),
+then finding E_0 and a_0 values in the same way as above on this transformed correlator.</p>
+<p>Priors for oscillaing states are guessed from knowledge of the non-oscillating states, i.e. basically the same with larger errors.</p>
+<p>3-point amplitudes are estimated using the ratio</p>
+<p>R = [ mean over t=t_cut -&gt; t=T-t_cut ] ( C_{3pt}(t)/ C_{2pt,1}(t) * C_{2pt,2}(T-t) ),</p>
+<p>where the C_{2pt,1/2} are the correlators for the two states on either side of the current. t is the timeslice of the current and T is the source/sink temporal separation. This ratio is equal to J/(a_1 * a_2), where J is the transition amplitude and a_{1/2} are the amplitudes of the 2-point correlators. Then we find J = R * a_1 * a_2. The rest of the 3-point priors, those coupling to oscillating states and excited states, are generically set to <code class="docutils literal notranslate"><span class="pre">0.0(1.0)</span></code>.</p>
+</div>
+<div class="section" id="some-tests">
+<h2>Some Tests<a class="headerlink" href="#some-tests" title="Permalink to this headline">¶</a></h2>
+<p>I ran some tests.</p>
+<img alt="_images/DsmassvsNsubset.png" src="_images/DsmassvsNsubset.png" />
+<p>This is the ground state energy of a D_s meson, computed using the HISQ action on the MILC 2+1+1 ensembles. N_subset is the number of points used
+to deduce priors, which are shown in blue. The black points are fit results from fitting 986-N_subset correlators using corrfitter, using these
+priors. I ran each test 5 times (hence 5 points per N_subset choice), each with a different randomly chosen subset.</p>
+<p>Here is the same thing for the ground state amplitude:</p>
+<img alt="_images/DsampvsNsubset.png" src="_images/DsampvsNsubset.png" />
+<p>And for a 3-point amplitude of a scalar current between a Ds meson and a heavy-strage meson (with heavy mass = 0.5):</p>
+<img alt="_images/SvsNsubset.png" src="_images/SvsNsubset.png" />
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">CorrBayes</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">More Details</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#how-it-works">How it works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#some-tests">Some Tests</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tagnaming.html">Tag Naming Convention</a></li>
+<li class="toctree-l1"><a class="reference internal" href="func.html">Function Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="intro.html" title="previous chapter">Introduction</a></li>
+      <li>Next: <a href="tagnaming.html" title="next chapter">Tag Naming Convention</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Euan McLean.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/details.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

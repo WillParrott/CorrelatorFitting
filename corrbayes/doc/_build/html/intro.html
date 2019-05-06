@@ -1,0 +1,135 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Introduction &#8212; CorrBayes 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="More Details" href="details.html" />
+    <link rel="prev" title="CorrBayes Documentation" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<p>Hello.</p>
+<p>This is a small module that finds sensible priors for correlation functions (to be fit using the <code class="docutils literal notranslate"><span class="pre">corrfitter</span></code> package)
+in an automatic and pure-Bayesian way.</p>
+<p>Traditionally, one would design priors for a correlator fit using some combination of QCD-inspired rules of thumb
+(“the spectrum is separated by about Lambda_QCD” ), and empirical-Bayes type arguments
+(like eyeing the effective mass of correlators averaged over all configurations). While empirical Bayes approaches are often
+fine since they approximate a pure Bayesian result, they do <em>technically</em> involve double-counting the information avaliable to us,
+and this makes some people feel on-edge.</p>
+<p>This module produces priors in a pure Bayesian way. With a gv.Dataset.Dataset full of correlators <code class="docutils literal notranslate"><span class="pre">dset</span></code>, you can run</p>
+<p><code class="docutils literal notranslate"><span class="pre">prior,</span> <span class="pre">new_dset</span> <span class="pre">=</span> <span class="pre">CorrBayes.get_prior(</span> <span class="pre">dset,</span> <span class="pre">1,</span> <span class="pre">nexp</span> <span class="pre">)</span></code></p>
+<p>This line will shave off a (randomly chosen) single datapoint for each key (e.g. a correlator for each key on a single configuration),
+and return <code class="docutils literal notranslate"><span class="pre">new_dset</span></code>, the same as <code class="docutils literal notranslate"><span class="pre">dset</span></code> but with that single point taken out. Then that point is used to deduce sensible priors
+for a fit using <code class="docutils literal notranslate"><span class="pre">new_dset</span></code>. No information from <code class="docutils literal notranslate"><span class="pre">new_dset</span></code> has been used to determine these priors, hence no double-counting of
+information.</p>
+<p>If you are also doing fits to 3-point correlators, this can be handled too. All you need to do is pass an argument into get_priors called
+“currents”, this must be a list of strings giving the name you gave the current in your datatag convention (See tag conventions section).</p>
+<p>The second argument of <code class="docutils literal notranslate"><span class="pre">get_prior</span></code> in the above code segment gives the number of points to be used for working out priors (therefore also the number of points shaved off the datset). One is fine in many cases, but if your correlators are noisy (e.g. vector mesons),
+then cranking this up to 10 or 20 would make the process more stable.</p>
+<p>I should also mention; this only works for single source/sink combinations, e.g. if you’re planning on using a matrix of smearings,
+this won’t work properly. If you want to use this, let me know and I’ll adapt the code so it can handle that kind of thing.</p>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">CorrBayes</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="details.html">More Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tagnaming.html">Tag Naming Convention</a></li>
+<li class="toctree-l1"><a class="reference internal" href="func.html">Function Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">CorrBayes Documentation</a></li>
+      <li>Next: <a href="details.html" title="next chapter">More Details</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Euan McLean.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/intro.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
