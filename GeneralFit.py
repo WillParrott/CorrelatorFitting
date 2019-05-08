@@ -22,7 +22,7 @@ F['tp'] = 96
 F['L'] = 32
 F['tminG'] = 2
 F['tminNG'] = 2
-F['tminD'] = 2
+F['tminD'] = 3
 F['Stmin'] = 2
 F['Vtmin'] = 1
 F['an'] = '0.2(2)'
@@ -68,25 +68,26 @@ SF['threePtTag'] = ['{0}.T{1}_m{2}_m{3}_m{2}','{0}.T{1}_m{2}_m{3}_m{2}_tw{4}','{
 ################ USER INPUTS ################################
 #############################################################
 DoFit = True
+FitAll = False
 TestData = False
-Fit = SF                                               # Choose to fit F, SF or UF
-FitMasses = [0]#,1,2,3]                                 # Choose which masses to fit
+Fit = F                                               # Choose to fit F, SF or UF
+FitMasses = [0,1,2,3]                                 # Choose which masses to fit
 FitTwists = [0,1,2,3,4]                               # Choose which twists to fit
-FitTs = [0]#,1,2]
+FitTs = [0,1,2]
 FitCorrs = ['G','NG','D','S','V']  # Choose which corrs to fit ['G','NG','D','S','V']
 Chained = False
 CorrBayes = False
-SaveFit = False
+SaveFit = True
 svdnoise = False
 priornoise = False
-ResultPlots = 'N'         # Tell what to plot against, "Q", "N","Log(GBF)" False
-svd = 'Auto'                           # Choose svd cut or set to 'Auto'
+ResultPlots = 'N'         # Tell what to plot against, "Q", "N","Log(GBF)", False
+AutoSvd = True                          
 Nmax = 7                               # Number of exp to fit nterm dictates which will not be marginalised 
                       
 ##############################################################
 ##############################################################
 
-def make_params():
+def make_params(FitMasses, FitTwists,FitTs):
     TwoPts = collections.OrderedDict()
     ThreePts = collections.OrderedDict()
     masses = []
@@ -110,7 +111,7 @@ def make_params():
                 ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)] = Fit['threePtTag'][Fit['twists'].index(twist)].format('current-scalar',T,m_s,mass,twist)
                 ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)] = Fit['threePtTag'][Fit['twists'].index(twist)].format('current-vector',T,m_s,mass,twist)
                 
-    return(filename,TwoPts,ThreePts,masses,twists,Ts)
+    return(TwoPts,ThreePts,masses,twists,Ts)
 
 
 
@@ -198,7 +199,7 @@ def eff_calc():
         p = np.sqrt(3)*np.pi*float(twist)/Fit['L']
         M_effTheory = gv.sqrt(M_eff['Dtw0']**2 + p**2)
         if abs(((M_eff['Dtw{0}'.format(twist)]-M_effTheory)/M_effTheory).mean) > 0.1:
-            print('Substituted M_effTheory for twist: ',twist, 'Difference: ',(M_eff['Dtw{0}'.format(twist)]-M_effTheory)/M_effTheory,'old: ',M_eff['Dtw{0}'.format(twist)],'New: ',M_effTheory)
+            print('Substituted M_effTheory for twist',twist, 'Difference:',(M_eff['Dtw{0}'.format(twist)]-M_effTheory)/M_effTheory,'old:',M_eff['Dtw{0}'.format(twist)],'New:',M_effTheory)
             M_eff['Dtw{0}'.format(twist)] = copy.deepcopy(M_effTheory)
             
     #print('M_eff',M_eff)        
@@ -421,8 +422,8 @@ def modelsandsvd(N):
     else:
         models = make_models()   
     print('Models made: ', models)
-    if svd == 'Auto':
-        File = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}.pickle'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],Chained)
+    File = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}.pickle'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],Chained)
+    if AutoSvd == True:        
         if os.path.isfile(File) == True:
             pickle_off = open(File,"rb")
             svdcut = pickle.load(pickle_off)
@@ -430,14 +431,29 @@ def modelsandsvd(N):
         else:
             print('Calculating svd')
             s = gv.dataset.svd_diagnosis(cf.read_dataset(filename), models=models)
-            s.plot_ratio(show=True)        
-            svdcut = s.svdcut
-            print('Calculated svdcut: ',svdcut)
+            s.plot_ratio(show=True)
+            var = input("Hit enter to accept svd = {0}, or else type svd here:".format(s.svdcut))
+            if var == '':
+                svdcut = s.svdcut
+                print('Used calculated svdcut: ',svdcut)
+            else:
+                svdcut = float(var)
+                print('Used alternative svdcut: ',svdcut)                
             pickling_on = open(File, "wb")
             pickle.dump(svdcut,pickling_on)
             pickling_on.close()
     else:
-        svdcut = svd
+        if os.path.isfile(File) == True:
+            pickle_off = open(File,"rb")
+            previous = pickle.load(pickle_off)
+            var = input('Hit enter to use previously chosen svd {0}, or type new one:'.format(previous))
+            if var == '':
+                svdcut = previous
+            else:
+                svdcut = float(var)                
+        else:
+            var = input('Type new svd:')
+            svdcut = float(var)
         print('Using input svdcut: ', svdcut)
     return(models,svdcut)
 
@@ -512,39 +528,8 @@ def main(Autoprior,data):
         models,svdcut = modelsandsvd('somenumber')
         Fitter = cf.CorrFitter(models=models, svdcut=svdcut, fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, fast=False)
         while GBF2-GBF1 > 0.5:           
-            fname = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],Chained)
-            if os.path.isfile('{0}{1}.pickle'.format(fname,Nexp)):
-                pickle_off = open('{0}{1}.pickle'.format(fname,Nexp),"rb")
-                p0 = pickle.load(pickle_off)
-                print('Used existing p0 for Nexp')                
-            elif os.path.isfile('{0}{1}.pickle'.format(fname,Nexp+1)):
-                pickle_off = open('{0}{1}.pickle'.format(fname,Nexp+1),"rb")
-                p1 = pickle.load(pickle_off)
-                for key in TwoKeys:
-                    if key in p1.keys():
-                        #p1[key].pop(Nexp)        
-                        p0[key]=p1[key]
-                print('Used existing p0 for Nexp+1')
-            elif os.path.exists('Ps/{0}.pickle'.format(Fit['conf'])):
-                pickle_off = open('Ps/{0}.pickle'.format(Fit['conf']),"rb")
-                p1 = pickle.load(pickle_off)
-                for key in TwoKeys:
-                    if key in p1.keys():                    
-                        if len(p1[key]) >= Nexp:                            
-                            p0.pop(key,None)                            
-                            p0[key] = np.zeros((Nexp))                            
-                            for n in range(Nexp):
-                                p0[key][n] = p1[key][n]                            
-                            print('Used global p0',key)
-                for key in ThreeKeys:
-                    if key in p1.keys():                    
-                        if np.shape(p1[key])[0] >= Nexp:                            
-                            p0[key]=np.zeros((Nexp,Nexp))
-                            for n in range(Nexp):
-                                for m in range(Nexp):
-                                    p0[key][n][m]=p1[key][n][m]
-                            print('Used global p0',key)
-                #print('Used existing global p0')                
+            fname = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],Chained)            
+            p0 = load_p0(p0,Nexp,fname,TwoKeys,ThreeKeys)                    
             GBF1 = GBF2
             print('Making Prior')
             if CorrBayes == True:
@@ -552,14 +537,19 @@ def main(Autoprior,data):
             prior = make_prior(Nexp,M_eff,A_eff,V_eff,Autoprior)
             print(30 * '=','Unchained-Unmarginalised','Nexp =',Nexp)
             #print('P0 Used: ',p0)
-            fit = Fitter.lsqfit(data=data, prior=prior,  p0=p0, add_svdnoise=svdnoise, add_priornoise=priornoise)
+            fit = Fitter.lsqfit(data=data, prior=prior,  p0=p0, add_svdnoise=svdnoise, add_priornoise=priornoise)            
             GBF2 = fit.logGBF
-            if GBF2-GBF1 > 0:
-                if ResultPlots == 'Q':
+            if fit.Q>=0.05:
+                pickling_on = open('{0}{1}.pickle'.format(fname,Nexp), "wb")
+                pickle.dump(fit.pmean,pickling_on)
+                pickling_on.close()
+            if GBF2-GBF1 >= 0:
+                if FitAll == False:
+                    if ResultPlots == 'Q':
                         plots(fit.Q,fit.p,Nexp)
-                if ResultPlots == 'GBF':
+                    if ResultPlots == 'GBF':
                         plots(GBF2,fit.p,Nexp)
-                if ResultPlots == 'N':
+                    if ResultPlots == 'N':
                         plots(Nexp,fit.p,fit.Q)
                 print(fit.format(pstyle=None if Nexp<3 else'v'))
                 print('Nexp = ',Nexp)
@@ -567,68 +557,24 @@ def main(Autoprior,data):
                 print('log(GBF) = {0:.1f}, up {1:.1f}'.format(GBF2,GBF2-GBF1))       
                 print('chi2/dof = {0:.2f}'.format(fit.chi2/fit.dof))
                 print('SVD noise = {0} Prior noise = {1}'.format(svdnoise,priornoise))
-                if fit.Q >= 0.05:                    
+                if fit.Q >= 0.05:
+                    p0=fit.pmean
+                    save_p0(p0,Nexp,fname,TwoKeys,ThreeKeys)
                     if SaveFit == True:
                         gv.dump(fit.p,'Fits/{5}5_Q{4:.2f}_Nexp{0}_Stmin{1}_Vtmin{2}_svd{3:.5f}_chi{6:.3f}'.format(Nexp,Fit['Stmin'],Fit['Vtmin'],svdcut,fit.Q,Fit['conf'],fit.chi2/fit.dof))
                         f = open('Fits/{5}5_Q{4:.2f}_Nexp{0}_Stmin{1}_Vtmin{2}_svd{3:.5f}_chi{6:.3f}.txt'.format(Nexp,Fit['Stmin'],Fit['Vtmin'],svdcut,fit.Q,Fit['conf'],fit.chi2/fit.dof), 'w')
                         f.write(fit.format(pstyle=None if Nexp<3 else'v'))
                         f.close()
             else:
-                print('log(GBF) had gone down by {2:.2f} from {0:.2f} to {1:.2f}'.format(GBF1,GBF2,GBF1-GBF2))            
-            if fit.Q >= 0.05:
-                pickling_on = open('{0}{1}.pickle'.format(fname,Nexp), "wb")
-                pickle.dump(fit.pmean,pickling_on)
-                pickling_on.close()
-                p0=fit.pmean                
-                if os.path.exists('Ps/{0}.pickle'.format(Fit['conf'])):
-                    rglobalpickle = open('Ps/{0}.pickle'.format(Fit['conf']), "rb")
-                    p1 = pickle.load(rglobalpickle)                    
-                    for key in TwoKeys:                        
-                        if key in p1.keys():
-                           # print('KKKKEEEYYY',key)
-                            if len(p0[key]) > len(p1[key]):      
-                                    p1.pop(key,None)
-                                    p1[key]=p0[key]
-                                    print('Replaced some elements of global p0', key)
-                        else:
-                            p1[key]=p0[key]
-                            print('Added new element to global p0',key)
-                    for key in ThreeKeys:
-                        #print('KEEYYYY',key)
-                        if key in p1.keys():
-                            if np.shape(p0[key])[0] >= np.shape(p1[key])[0]:      
-                                    p1.pop(key,None)
-                                    p1[key]=p0[key]
-                                    print('Replaced some elements of global p0', key)
-                        else:
-                            p1[key]=p0[key]
-                            print('Added new element to global p0',key)
-                    #print(p1)
-                    wglobalpickle = open('Ps/{0}.pickle'.format(Fit['conf']), "wb")
-                    pickle.dump(p1,wglobalpickle)
-                    wglobalpickle.close()
-                else:
-                    p2 = collections.OrderedDict()
-                    for key in TwoKeys:                        
-                        p2[key] = copy.deepcopy(p0[key])
-                    for key in ThreeKeys:                        
-                        p2[key] = copy.deepcopy(p0[key])
-                    wglobalpickle = open('Ps/{0}.pickle'.format(Fit['conf']), "wb")
-                    pickle.dump(p2,wglobalpickle)
-                    wglobalpickle.close()
-                            
-            
+                print('log(GBF) had gone down by {2:.2f} from {0:.2f} to {1:.2f}'.format(GBF1,GBF2,GBF1-GBF2))                
             print(100 * '+')
             print(100 * '+')
-            Nexp += 1            
-    plt.show()
+            Nexp += 1           
+    
     return()
 
 
-filename,TwoPts,ThreePts,masses,twists,Ts = make_params()
-Autoprior,data = make_data(filename,Nmax)
-gotnan = any(bool(a[~np.isfinite([p.mean for p in a])].size) for a in data.values())
-print('Nan or inf in data: ',gotnan)
+
 
 
 
@@ -658,7 +604,7 @@ def plots(Q,p,Nexp):
             y = result.mean
             err = result.sdev    
             plt.figure(mass)
-            plt.errorbar(Q,y,yerr=err, capsize=2, fmt='o', mfc='none', label=('{0} = {1:.2f}'.format(lab,Nexp)))
+            plt.errorbar(Q,y,yerr=err, capsize=2, fmt='o', mfc='none', label=('G {0} = {1:.2f}'.format(lab,Nexp)))
             plt.legend()
             plt.xlabel('{0}'.format(xlab))
             plt.ylabel('dE:{0}'.format(mass))
@@ -667,7 +613,7 @@ def plots(Q,p,Nexp):
             y = result.mean
             err = result.sdev    
             plt.figure(mass)
-            plt.errorbar(Q,y,yerr=err, capsize=2, fmt='o', mfc='none', label=('{0} = {1:.2f}'.format(lab,Nexp)))
+            plt.errorbar(Q,y,yerr=err, capsize=2, fmt='o', mfc='none', label=('NG {0} = {1:.2f}'.format(lab,Nexp)))
             plt.legend()
             plt.xlabel('{0}'.format(xlab))
             plt.ylabel('dE:{0}'.format(mass))
@@ -694,51 +640,63 @@ def plots(Q,p,Nexp):
 
 
 def test_data():
-    for t in range(Fit['tp']):
-        if 'D' in FitCorrs:
-            for twist in twists:
-                plt.figure(twist)
-                plt.errorbar(t, gv.log(data[TwoPts['Dtw{0}'.format(twist)]][t]).mean, yerr=gv.log(data[TwoPts['Dtw{0}'.format(twist)]][t]).sdev, fmt='ko',label=('log(D)'))
-                plt.title('Twist = {0}'.format(twist))
-                plt.legend()
-        if 'G' in FitCorrs:
-            for mass in masses:
-                plt.figure(mass)
-                plt.errorbar(t, gv.log(data[TwoPts['Gm{0}'.format(mass)]][t]).mean, yerr=gv.log(data[TwoPts['Gm{0}'.format(mass)]][t]).sdev, fmt='ko', label=('log(G)'))
-                plt.title('Mass = {0}'.format(mass))
-                plt.legend()
-        if 'NG' in FitCorrs:
-            for mass in masses:
-                plt.figure(mass)
-                plt.errorbar(t, gv.log(data[TwoPts['NGm{0}'.format(mass)]][t]).mean, yerr=gv.log(data[TwoPts['NGm{0}'.format(mass)]][t]).sdev, fmt='ro', label=('log(NG)'))
-                plt.title('Mass = {0}'.format(mass))
-                plt.legend()
-    for T in Ts:
-        for t in range(T):
-            if 'S' in FitCorrs:
-                for mass in masses:
-                    for twist in twists:                    
-                        plt.figure('S{0}{1}'.format(mass,twist))
-                        plt.errorbar(t, gv.log(data[ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]).mean, yerr=gv.log(data[ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]).sdev, label=('log(S) T{0}'.format(T)), fmt='ko')
-                        plt.title('S Mass = {0}, Twist = {1}'.format(mass, twist))
-                        plt.legend()
+    if 'D' in FitCorrs:
+        for twist in twists:
+            plt.figure(twist)
+            for t in range(Fit['tp']):                
+                plt.errorbar(t, gv.log(data[TwoPts['Dtw{0}'.format(twist)]][t]).mean, yerr=gv.log(data[TwoPts['Dtw{0}'.format(twist)]][t]).sdev, fmt='ko')
+            plt.title('D Twist = {0}'.format(twist))
+        #plt.legend()
+        
+    if 'G' in FitCorrs:                
+        for mass in masses:
+            plt.figure(mass)
+            for t in range(Fit['tp']):                
+                plt.errorbar(t, gv.log(data[TwoPts['Gm{0}'.format(mass)]][t]).mean, yerr=gv.log(data[TwoPts['Gm{0}'.format(mass)]][t]).sdev, fmt='ko')
+            plt.title('G NG Mass = {0}'.format(mass))
+        #plt.legend()
+    if 'NG' in FitCorrs:                
+        for mass in masses:
+            plt.figure(mass)
+            for t in range(Fit['tp']):                
+                plt.errorbar(t, gv.log(data[TwoPts['NGm{0}'.format(mass)]][t]).mean, yerr=gv.log(data[TwoPts['NGm{0}'.format(mass)]][t]).sdev, fmt='ro')
+            plt.title('G NG Mass = {0}'.format(mass))
+        #plt.legend()
 
-                        plt.figure('SRat{0}{1}'.format(mass,twist))
-                        plt.errorbar(t, (data[ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]/(data[TwoPts['Dtw{0}'.format(twist)]][t]*data[TwoPts['Gm{0}'.format(mass)]][T-t])).mean, yerr=(data[ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]/(data[TwoPts['Dtw{0}'.format(twist)]][t]*data[TwoPts['Gm{0}'.format(mass)]][T-t])).sdev, label=('S/DG T{0}'.format(T)),fmt='ko')
-                        plt.title('S Ratio Mass = {0}, Twist = {1}'.format(mass, twist))
-                        plt.legend()
-            if 'V' in FitCorrs:
-                for mass in masses:
-                    for twist in twists:                    
-                        plt.figure('V{0}{1}'.format(mass,twist))
-                        plt.errorbar(t, gv.log(data[ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]).mean, yerr=gv.log(data[ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]).sdev, label=('log(V) T{0}'.format(T)),fmt='ko')
-                        plt.title('V Mass = {0}, Twist = {1}'.format(mass, twist))
-                        plt.legend()
+    colours = ['r','k','b']
+    if 'S' in FitCorrs:        
+        for mass in masses:
+            for twist in twists:                    
+                plt.figure('S{0}{1}'.format(mass,twist))
+                for i,T in enumerate(Ts):
+                    for t in range(T):
+                        plt.errorbar(t, gv.log(data[ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]).mean, yerr=gv.log(data[ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]).sdev,  fmt='{0}o'.format(colours[i]))
+                plt.title('S Mass = {0}, Twist = {1}'.format(mass, twist))
+                #plt.legend()
 
-                        plt.figure('VRat{0}{1}'.format(mass,twist))
-                        plt.errorbar(t, (data[ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]/(data[TwoPts['Dtw{0}'.format(twist)]][t]*data[TwoPts['NGm{0}'.format(mass)]][T-t])).mean, yerr=(data[ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]/(data[TwoPts['Dtw{0}'.format(twist)]][t]*data[TwoPts['NGm{0}'.format(mass)]][T-t])).sdev, label=('S/DNG T{0}'.format(T)),fmt='ko')
-                        plt.title('V Ratio Mass = {0}, Twist = {1}'.format(mass, twist))
-                        plt.legend()
+                plt.figure('SRat{0}{1}'.format(mass,twist))
+                for i,T in enumerate(Ts):
+                    for t in range(T):
+                        plt.errorbar(t, (data[ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]/(data[TwoPts['Dtw{0}'.format(twist)]][t]*data[TwoPts['Gm{0}'.format(mass)]][T-t])).mean, yerr=(data[ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]/(data[TwoPts['Dtw{0}'.format(twist)]][t]*data[TwoPts['Gm{0}'.format(mass)]][T-t])).sdev, fmt='{0}o'.format(colours[i]))
+                plt.title('S Ratio Mass = {0}, Twist = {1}'.format(mass, twist))
+                #plt.legend()
+        
+    if 'V' in FitCorrs:
+        for mass in masses:
+            for twist in twists:                    
+                plt.figure('V{0}{1}'.format(mass,twist))
+                for i,T in enumerate(Ts):
+                    for t in range(T):
+                        plt.errorbar(t, gv.log(data[ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]).mean, yerr=gv.log(data[ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]).sdev, fmt='{0}o'.format(colours[i]))
+                plt.title('V Mass = {0}, Twist = {1}'.format(mass, twist))
+                #plt.legend()
+
+                plt.figure('VRat{0}{1}'.format(mass,twist))
+                for i,T in enumerate(Ts):
+                    for t in range(T):
+                        plt.errorbar(t, (data[ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]/(data[TwoPts['Dtw{0}'.format(twist)]][t]*data[TwoPts['NGm{0}'.format(mass)]][T-t])).mean, yerr=(data[ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)]][t]/(data[TwoPts['Dtw{0}'.format(twist)]][t]*data[TwoPts['NGm{0}'.format(mass)]][T-t])).sdev, fmt='{0}o'.format(colours[i]))
+                plt.title('V Ratio Mass = {0}, Twist = {1}'.format(mass, twist))
+                #plt.legend()
     plt.show()
     return()
 
@@ -767,20 +725,178 @@ def makeKeys():
     if 'S' in FitCorrs:
         for mass in masses:
             for twist in twists:
-                for T in Ts:
-                    ThreeKeys.append('SVnn_m{0}_tw{1}'.format(mass,twist))
+                ThreeKeys.append('SVnn_m{0}_tw{1}'.format(mass,twist))
+                ThreeKeys.append('SVno_m{0}_tw{1}'.format(mass,twist))
+                ThreeKeys.append('SVon_m{0}_tw{1}'.format(mass,twist))
+                ThreeKeys.append('SVoo_m{0}_tw{1}'.format(mass,twist))
     if 'V' in FitCorrs:
         for mass in masses:
             for twist in twists:
-                for T in Ts:
-                    ThreeKeys.append('VVnn_m{0}_tw{1}'.format(mass,twist))
+                ThreeKeys.append('VVnn_m{0}_tw{1}'.format(mass,twist))
+                ThreeKeys.append('VVon_m{0}_tw{1}'.format(mass,twist))
+                ThreeKeys.append('VVno_m{0}_tw{1}'.format(mass,twist))
+                ThreeKeys.append('VVoo_m{0}_tw{1}'.format(mass,twist))
     #print(TwoKeys,ThreeKeys)
     return(TwoKeys,ThreeKeys)
 
 
 
+def save_p0(p0,Nexp,fname,TwoKeys,ThreeKeys):                   
+    if os.path.exists('Ps/{0}.pickle'.format(Fit['conf'])):
+        rglobalpickle = open('Ps/{0}.pickle'.format(Fit['conf']), "rb")
+        p1 = pickle.load(rglobalpickle)                    
+        for key in TwoKeys:                        
+            if key in p1.keys():
+                if len(p0[key]) >= len(p1[key]):      
+                    p1.pop(key,None)
+                    p1[key]=p0[key]
+                    print('Replaced element of global p0:', key)
+            else:
+                p1[key]=p0[key]
+                print('Added new element to global p0:',key)
+        for key in ThreeKeys:
+            if key in p1.keys():
+                if np.shape(p0[key])[0] >= np.shape(p1[key])[0]:      
+                    p1.pop(key,None)
+                    p1[key]=p0[key]
+                    print('Replaced element of global p0:', key)
+            else:
+                p1[key]=p0[key]
+                print('Added new element to global p0:',key)
+        wglobalpickle = open('Ps/{0}.pickle'.format(Fit['conf']), "wb")
+        pickle.dump(p1,wglobalpickle)
+        wglobalpickle.close()
+    else:
+        p2 = collections.OrderedDict()
+        for key in TwoKeys:                        
+            p2[key] = copy.deepcopy(p0[key])
+        for key in ThreeKeys:                        
+            p2[key] = copy.deepcopy(p0[key])
+
+        wglobalpickle = open('Ps/{0}.pickle'.format(Fit['conf']), "wb")
+        pickle.dump(p2,wglobalpickle)
+        wglobalpickle.close()
+#################################### p0 Nexp ###########################             
+    if os.path.exists('Ps/{0}{1}.pickle'.format(Fit['conf'],Nexp)):
+        rglobalpickle = open('Ps/{0}{1}.pickle'.format(Fit['conf'],Nexp), "rb")
+        p1 = pickle.load(rglobalpickle)                    
+        for key in TwoKeys:                        
+            if key in p1.keys():                      
+                p1.pop(key,None)
+                p1[key]=p0[key]
+                #print('Replaced element of global p0 Nexp={0}:'.format(Nexp), key)
+            else:
+                p1[key]=p0[key]
+                print('Added new element to global p0 Nexp={0}:'.format(Nexp),key)
+        for key in ThreeKeys:
+            if key in p1.keys():                      
+                p1.pop(key,None)
+                p1[key]=p0[key]
+                #print('Replaced element of global p0 Nexp={0}:'.format(Nexp), key)
+            else:
+                p1[key]=p0[key]
+                print('Added new element to global p0 Nexp={0}:'.format(Nexp),key)
+        wglobalpickle = open('Ps/{0}{1}.pickle'.format(Fit['conf'],Nexp), "wb")
+        pickle.dump(p1,wglobalpickle)
+        wglobalpickle.close()
+    else:
+        p2 = collections.OrderedDict()
+        for key in TwoKeys:                        
+            p2[key] = copy.deepcopy(p0[key])
+        for key in ThreeKeys:                        
+            p2[key] = copy.deepcopy(p0[key])
+        wglobalpickle = open('Ps/{0}{1}.pickle'.format(Fit['conf'],Nexp), "wb")
+        pickle.dump(p2,wglobalpickle)
+        wglobalpickle.close()
+        
+    return()
+
+
+
+
+def load_p0(p0,Nexp,fname,TwoKeys,ThreeKeys):
+    elements1 = []
+    elements2 = []
+    if os.path.isfile('{0}{1}.pickle'.format(fname,Nexp)):
+        pickle_off = open('{0}{1}.pickle'.format(fname,Nexp),"rb")
+        p0 = pickle.load(pickle_off)
+        print('Using existing p0 for Nexp')                
+    elif os.path.isfile('{0}{1}.pickle'.format(fname,Nexp+1)):
+        pickle_off = open('{0}{1}.pickle'.format(fname,Nexp+1),"rb")
+        p1 = pickle.load(pickle_off)
+        for key in TwoKeys:
+            if key in p1.keys():
+                #p1[key].pop(Nexp)        
+                p0[key]=p1[key]
+        print('Using existing p0 for Nexp+1')
+    
+    elif os.path.exists('Ps/{0}.pickle'.format(Fit['conf'])):
+        pickle_off = open('Ps/{0}.pickle'.format(Fit['conf']),"rb")
+        p1 = pickle.load(pickle_off)
+        for key in TwoKeys:
+            if key in p1.keys():                    
+                if len(p1[key]) >= Nexp:
+                    elements1.append(key)
+                    p0.pop(key,None)                            
+                    p0[key] = np.zeros((Nexp))                            
+                    for n in range(Nexp):
+                        p0[key][n] = p1[key][n]                            
+        for key in ThreeKeys:
+            if key in p1.keys():                    
+                if np.shape(p1[key])[0] >= Nexp:
+                    p0.pop(key,None)
+                    p0[key]=np.zeros((Nexp,Nexp))
+                    elements1.append(key)
+                    for n in range(Nexp):
+                        for m in range(Nexp):
+                            p0[key][n][m]=p1[key][n][m]
+        if os.path.exists('Ps/{0}{1}.pickle'.format(Fit['conf'],Nexp)):
+            pickle_off = open('Ps/{0}{1}.pickle'.format(Fit['conf'],Nexp),"rb")
+            p2 = pickle.load(pickle_off)
+            for key in TwoKeys:
+                if key in p2.keys():
+                    p0.pop(key,None)
+                    p0[key] = p2[key]                    
+                    elements2.append(key)         
+            for key in ThreeKeys:
+                if key in p2.keys():
+                   p0.pop(key,None)
+                   p0[key]=p2[key]
+                   elements2.append(key)
+        for element in elements1:
+            if element in elements2:
+                print('Using element of global p0 Nexp={0}:'.format(Nexp),element)
+            else:
+                print('Using element of global p0:',element)
+    return(p0)
+
+
+
+
+
+
 if TestData == True:
     test_data()
-
+    
 if DoFit == True:
-    main(Autoprior,data)
+    filename = Fit['filename']
+    Autoprior,data = make_data(filename,Nmax)
+    gotnan = any(bool(a[~np.isfinite([p.mean for p in a])].size) for a in data.values())
+    print('Nan or inf in data: ',gotnan)
+    if FitAll == True:
+        for i in range(4):
+            for j in range(5):
+                FitMasses = [i]
+                FitTwists = [j]
+                FitTs = [0]
+                TwoPts,ThreePts,masses,twists,Ts = make_params(FitMasses, FitTwists,FitTs)
+                main(Autoprior,data)
+                            
+    else:
+        filename = Fit['filename']
+        TwoPts,ThreePts,masses,twists,Ts = make_params(FitMasses,FitTwists,FitTs)
+        Autoprior,data = make_data(filename,Nmax)
+        gotnan = any(bool(a[~np.isfinite([p.mean for p in a])].size) for a in data.values())
+        print('Nan or inf in data: ',gotnan)
+        main(Autoprior,data)
+        plt.show()
