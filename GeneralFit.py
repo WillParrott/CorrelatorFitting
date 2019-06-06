@@ -1,3 +1,4 @@
+
 import collections
 import sys
 import h5py
@@ -70,7 +71,7 @@ SF['threePtTag'] = ['{0}.T{1}_m{2}_m{3}_m{2}','{0}.T{1}_m{2}_m{3}_m{2}_tw{4}','{
 DoFit = True
 FitAll = False
 TestData = False
-Fit = SF                                               # Choose to fit F, SF or UF
+Fit = F                                               # Choose to fit F, SF or UF
 FitMasses = [0,1,2,3]                                 # Choose which masses to fit
 FitTwists = [0,1,2,3,4]                               # Choose which twists to fit
 FitTs = [0,1,2]
@@ -78,10 +79,10 @@ FitCorrs = ['G','NG','D','S','V']  # Choose which corrs to fit ['G','NG','D','S'
 Chained = False
 CorrBayes = False
 SaveFit = True
-svdnoise = False
-priornoise = False
+svdnoise = True
+priornoise = True
 ResultPlots = 'N'         # Tell what to plot against, "Q", "N","Log(GBF)", False
-AutoSvd = False
+AutoSvd = True
 SvdFactor = 1.0           # Multiplies saved SVD 
 Nmax = 7                               # Number of exp to fit nterm dictates which will not be marginalised 
                       
@@ -459,21 +460,24 @@ def modelsandsvd(N):
     if AutoSvd == True:        
         if os.path.isfile(File) == True:
             pickle_off = open(File,"rb")
-            svdcut = SvdFactor*pickle.load(pickle_off)
-            print('Used existing svdcut times factor {0}:'.format(SvdFactor), svdcut)
+            trueSvd = pickle.load(pickle_off)
+            svdcut = SvdFactor*trueSvd
+            print('Used existing svdcut {0} times factor {1}:'.format(trueSvd,SvdFactor), svdcut)
         else:
             print('Calculating svd')
             s = gv.dataset.svd_diagnosis(cf.read_dataset(filename), models=models)
             s.plot_ratio(show=True)
             var = input("Hit enter to accept svd = {0}, or else type svd here:".format(s.svdcut))
             if var == '':
-                svdcut = s.svdcut*SvdFactor
-                print('Used calculated svdcut times factor {0}:'.format(SvdFactor),svdcut)
+                trueSvd = s.svdcut
+                svdcut = trueSvd*SvdFactor
+                print('Used calculated svdcut {0}, times factor {1}:'.format(trueSvd,SvdFactor),svdcut)
             else:
-                svdcut = SvdFactor*float(var)
-                print('Used alternative svdcut {0}, times factor {1}'.format(float(var),SvdFactor))                
+                trueSvd = float(var)
+                svdcut = SvdFactor*trueSvd
+                print('Used alternative svdcut {0}, times factor {1}:'.format(float(var),SvdFactor), svdcut)                
             pickling_on = open(File, "wb")
-            pickle.dump(svdcut,pickling_on)
+            pickle.dump(trueSvd,pickling_on)
             pickling_on.close()
     else:
         if os.path.isfile(File) == True:
@@ -481,13 +485,19 @@ def modelsandsvd(N):
             previous = pickle.load(pickle_off)
             var = input('Hit enter to use previously chosen svd {0}, times factor {1} or type new one:'.format(previous,SvdFactor))
             if var == '':
-                svdcut = SvdFactor*previous
+                trueSvd =  previous
+                svdcut = SvdFactor*trueSvd
             else:
-                svdcut = Svdfactor*float(var)                
+                trueSvd = float(var)
+                svdcut = SvdFactor*trueSvd               
         else:
             var = input('Type new svd:')
-            svdcut = SvdFactor*float(var)
-        print('Using input svdcut {0}, times factor {1} '.format(var,SvdFactor))
+            trueSvd = float(var)
+            svdcut = SvdFactor*trueSvd
+        print('Using svdcut {0}, times factor {1}:'.format(trueSvd,SvdFactor),svdcut)
+        pickling_on = open(File, "wb")
+        pickle.dump(trueSvd,pickling_on)
+        pickling_on.close()
     return(models,svdcut)
 
         

@@ -13,7 +13,7 @@ F['m_s'] = '0.0376'
 F['Ts'] = [14,17,20]
 F['tp'] = 96
 F['L'] = 32
-F['a'] = '0.0884(6)'
+F['w0/a'] = '1.9006(20)'
 F['goldTag'] = 'meson.m{0}_m{1}'
 F['nonGoldTag'] = 'meson-G5T.m{0}_m{1}'
 F['daugterTag'] = ['etas','etas_p0.0728','etas_p0.218','etas_p0.364','etas_p0.437','etas_p0.509'] 
@@ -22,14 +22,14 @@ F['threePtTag'] = ['{0}.T{1}_m{2}_m{3}_m{2}','{0}.T{1}_m{2}_m{3}_m{2}_tw{4}','{0
 ######################## SF PARAMETERS ####################################
 SF = collections.OrderedDict()
 SF['conf']='SF'
-SF['filename'] = 'Fits/SF5_Q1.00_Nexp4_Stmin2_Vtmin2_svd0.00500'
+SF['filename'] = 'Fits/SF5_Q1.00_Nexp5_Stmin2_Vtmin2_svd0.01000_chi0.199'
 SF['Masses'] = ['0.274','0.450','0.6','0.8']
 SF['Twists'] = ['0','1.261','2.108','2.946','3.624']
 SF['m_s'] = '0.0234'
 SF['Ts'] = [20,25,30]
 SF['tp'] = 144
 SF['L'] = 48
-SF['a'] = '0.05922(12)'
+SF['w0/a'] = '2.896(6)'
 SF['goldTag'] = 'meson.m{0}_m{1}'
 SF['nonGoldTag'] = 'meson2G5T.m{0}_m{1}'
 SF['daugterTag'] = ['etas_p0','etas_p0.143','eta_s_tw2.108_m0.0234','etas_p0.334','eta_s_tw3.624_m0.0234']
@@ -42,14 +42,18 @@ FMasses = [0,1,2,3]                                     # Choose which masses to
 FTwists = [0,1,2,3,4]
 SFMasses = [0,1,2,3]
 SFTwists = [0,1,2,3,4]
-GeV = False
+GeV = True
 ############################################################################
 ############################################################################
-   
 
+ 
 
 def make_params():
-    for Fit in [F,SF]:
+    w0 = gv.gvar('0.1715(9)')  #fm
+    hbar = gv.gvar('6.58211928(15)')
+    c = 2.99792458
+    for Fit in [F,SF]:    
+        Fit['a'] = w0/((hbar*c*1e-2)*gv.gvar(Fit['w0/a']))
         Fit['masses'] = []
         Fit['twists'] = []
         Fit['momenta'] = []
@@ -175,10 +179,7 @@ def plot_f(Fit,F_0,F_plus,qSq,Z,Sca,Vec):
 
 def main():    
     make_params()
-    for Fit in Fits:
-        hbar = '6.58211928(15)'
-        c = 2.99792458
-        a = gv.gvar(Fit['a'])/(gv.gvar(hbar)*c*1e-2)               
+    for Fit in Fits:                       
         print('Plot for', Fit['filename'] )
         get_results(Fit)
         F_0 = collections.OrderedDict()
@@ -204,7 +205,7 @@ def main():
                     F0 = (float(mass) - float(Fit['m_s']))*(1/(Fit['M_G_m{0}'.format(mass)]**2 - Fit['M_D_tw{0}'.format(twist)]**2))*Fit['Sm{0}_tw{1}'.format(mass,twist)]               
                     F_0[mass].append(F0)
                     if GeV == True:
-                        qSq[mass].append(qsq/(a**2))                      
+                        qSq[mass].append(qsq/(Fit['a']**2))                      
                     else:
                         qSq[mass].append(qsq)                    
                     Z[mass].append(z)                        
@@ -228,10 +229,36 @@ main()
 
 
 def speedtest():
-    csq = collections.OrderedDict()
-    for mass in masses:
-        for i in range(len(twists)):
-            csq['m_{0}tw_{1}'.format(mass,twists[i])] = E_eta[twists[i]]**2/(momenta[i]**2+E_eta['0']**2)
-    print(csq)
+    make_params()
+    plt.figure()
+    for Fit in Fits:        
+        get_results(Fit)        
+        csq = collections.OrderedDict()
+        for i in range(len(Fit['twists'])):
+            csq['{0}tw_{1}'.format(Fit['conf'],Fit['twists'][i])] = Fit['E_D_tw{0}'.format(Fit['twists'][i])]**2/(Fit['momenta'][i]**2+Fit['E_D_tw{0}'.format(Fit['twists'][0])]**2)
+            plt.errorbar(float(Fit['twists'][i]),csq['{0}tw_{1}'.format(Fit['conf'],Fit['twists'][i])].mean, yerr = csq['{0}tw_{1}'.format(Fit['conf'],Fit['twists'][i])].sdev, label=('{0}tw_{1}'.format(Fit['conf'],Fit['twists'][i])),  fmt='o', mfc='none')
+    plt.plot([0,4],[1,1],'k--',lw=1)
+    plt.legend()
+    plt.xlabel('p')
+    plt.ylabel('c')
+    plt.show()
     return(csq)
-#speedtest()
+speedtest()
+
+
+def findDelta():
+    plt.figure()
+    #Delta = collections.OrderedDict()
+    for Fit in Fits:        
+        p = gv.load(Fit['filename'])
+        for mass in Fit['masses']:
+            Delta = (p['dE:o{0}'.format(Fit['Gm{0}'.format(mass)])][0]-p['dE:{0}'.format(Fit['Gm{0}'.format(mass)])][0])/Fit['a']
+            print(Fit['conf'],mass, Delta)
+            
+            plt.errorbar(float(mass), Delta.mean, yerr=Delta.sdev,fmt='o', mfc='none', label=Fit['conf'])
+    plt.xlabel('Heavy Mass')
+    plt.ylabel('Delta (GeV)')
+    plt.show()
+    return()
+
+findDelta()
