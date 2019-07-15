@@ -22,7 +22,7 @@ F['threePtTag'] = ['{0}.T{1}_m{2}_m{3}_m{2}','{0}.T{1}_m{2}_m{3}_m{2}_tw{4}','{0
 ######################## SF PARAMETERS ####################################
 SF = collections.OrderedDict()
 SF['conf']='SF'
-SF['filename'] = 'Fits/SF5_Q1.00_Nexp5_Stmin2_Vtmin2_svd0.01000_chi0.199'
+SF['filename'] = 'Fits/SF5_Q1.00_Nexp3_Stmin2_Vtmin2_svd0.05000_chi0.118'
 SF['Masses'] = ['0.274','0.450','0.6','0.8']
 SF['Twists'] = ['0','1.261','2.108','2.946','3.624']
 SF['m_s'] = '0.0234'

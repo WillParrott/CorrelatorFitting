@@ -32,7 +32,7 @@ F['threePtTag'] = ['{0}.T{1}_m{2}_m{3}_m{2}','{0}.T{1}_m{2}_m{3}_m{2}_tw{4}','{0
 ######################## SF PARAMETERS ####################################
 SF = collections.OrderedDict()
 SF['conf']='SF'
-SF['filename'] = 'Fits/SF5_Q1.00_Nexp5_Stmin2_Vtmin2_svd0.01000_chi0.199'
+SF['filename'] = 'Fits/SF5_Q1.00_Nexp3_Stmin2_Vtmin2_svd0.05000_chi0.118'
 SF['Masses'] = ['0.274','0.450','0.6','0.8']
 SF['Twists'] = ['0','1.261','2.108','2.946','3.624']
 SF['m_s'] = '0.0234'
@@ -54,12 +54,13 @@ FMasses = [0,1,2,3]                                     # Choose which masses to
 FTwists = [0,1,2,3,4]
 SFMasses = [0,1,2,3]
 SFTwists = [0,1,2,3,4]
-AddRho = False
+AddRho = True
 svdnoise = False
 priornoise = False
 Pri = '0.00(2.00)'
 DoFit = True
 N = 3
+SHOWPLOTS = True
 ############################################################################
 ############################################################################
    
@@ -260,7 +261,7 @@ def main():
             p0 = None
         #s = gv.dataset.svd_diagnosis(f)
         #s.plot_ratio(show=True)
-        fit = lsqfit.nonlinear_fit(data=f, prior=prior, p0=p0, fcn=fcn, svdcut=1e-12,add_svdnoise=svdnoise, add_priornoise=priornoise,fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, tol=(1e-6,0.0,0.0) )
+        fit = lsqfit.nonlinear_fit(data=f, prior=prior, p0=p0, fcn=fcn, svdcut=1e-15 ,add_svdnoise=svdnoise, add_priornoise=priornoise,fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, tol=(1e-6,0.0,0.0) )
         gv.dump(fit.p,'Extraps/{0}{1}chi{2:.3f}'.format(AddRho,N,fit.chi2/fit.dof))
         print(fit.format(maxline=True))        
         #print(fit)
@@ -276,7 +277,7 @@ def main():
      
        
 def plots(prior,f,Metasphys,p,x):
-    Z,Qsq,MBsphys,MBsstarphys,F0mean,F0upp,F0low,Fplusmean,Fplusupp,Fpluslow = plot_results(Metasphys,p,x,prior,f)
+    Z,Zmax,Qsq,MBsphys,MBsstarphys,F0mean,F0upp,F0low,Fplusmean,Fplusupp,Fpluslow,F0meanpole,F0upppole,F0lowpole,Fplusmeanpole,Fplusupppole,Fpluslowpole = plot_results(Metasphys,p,x,prior,f)
     cols = ['b','g','r','c','m','y','k','purple']
     plt.figure(1)
     Fit = F
@@ -311,9 +312,9 @@ def plots(prior,f,Metasphys,p,x):
                 yerr.append((f['0{0}'.format(datatag)]*(1-prior['qsq_{0}'.format(datatag)]/(prior['MHs0_{0}_m{1}'.format(Fit['conf'],mass)]**2))).sdev)
         plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, mfc='none')
         plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, mfc='none',fmt='^',label=('{0}_m{1}'.format(Fit['conf'],mass)))
-    plt.plot(Z,F0mean, color='k')
+    plt.plot(Z,F0mean, color='b')
     #plt.plot(Z,F0upp, color='r')
-    plt.fill_between(Z,F0low,F0upp, color='r')
+    plt.fill_between(Z,F0low,F0upp, color='b',alpha=0.4)
     plt.legend()
     plt.xlabel('z',fontsize=20)
     plt.ylabel(r'$(1-\frac{q^2}{M^2_{H_{s}^0}})f_0$',fontsize=20)
@@ -351,20 +352,124 @@ def plots(prior,f,Metasphys,p,x):
                 yerr.append((f['plus{0}'.format(datatag)]*(1-prior['qsq_{0}'.format(datatag)]/(prior['MHsstar_{0}_m{1}'.format(Fit['conf'],mass)]**2))).sdev)
         plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, mfc='none')
         plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, fmt='^',mfc='none',label=('{0}_m{1}'.format(Fit['conf'],mass)))
-    plt.plot(Z,Fplusmean, color='k')
+    plt.plot(Z,Fplusmean, color='r')
     #plt.plot(Z,Fplusupp, color='g')
-    plt.fill_between(Z,Fpluslow,Fplusupp, color='r')
+    plt.fill_between(Z,Fpluslow,Fplusupp, color='r',alpha=0.4)
     plt.legend()
     plt.xlabel('z',fontsize=20)
     plt.ylabel(r'$(1-\frac{q^2}{M^2_{H_{s}^*}})f_{plus}$',fontsize=20)
     plt.savefig('Extraps/fpluspole')
-    plt.show()
+
+
+
+    plt.figure(7)
+    Fit = F
+    for i , mass in enumerate(Fit['masses']):
+        xmean = [] 
+        xerr = [] 
+        ymean = [] 
+        yerr = []
+        col = cols[i]        
+        for twist in Fit['twists']:
+            datatag = '{0}_m{1}_tw{2}'.format(Fit['conf'],mass,twist)    
+            if '0{0}'.format(datatag) in f:
+                xmean.append(prior['z_{0}'.format(datatag)].mean)
+                ymean.append(f['0{0}'.format(datatag)].mean)
+                xerr.append(prior['z_{0}'.format(datatag)].sdev)
+                yerr.append(f['0{0}'.format(datatag)].sdev)
+        plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, mfc='none')
+        plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, fmt='o', mfc='none',ms=12,label=('{0}_m{1}'.format(Fit['conf'],mass)))
+    Fit = SF
+    for i , mass in enumerate(Fit['masses']):
+        xmean = [] 
+        xerr = [] 
+        ymean = [] 
+        yerr = []
+        col = cols[i+4]        
+        for twist in Fit['twists']:
+            datatag = '{0}_m{1}_tw{2}'.format(Fit['conf'],mass,twist)    
+            if '0{0}'.format(datatag) in f:
+                xmean.append(prior['z_{0}'.format(datatag)].mean)
+                ymean.append(f['0{0}'.format(datatag)].mean)
+                xerr.append(prior['z_{0}'.format(datatag)].sdev)
+                yerr.append(f['0{0}'.format(datatag)].sdev)
+        plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, mfc='none',linestyle='--')
+        plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, mfc='none',fmt='^',ms=12,label=('{0}_m{1}'.format(Fit['conf'],mass)))
+    plt.plot(Z,F0meanpole, color='b')
+    #plt.plot(Z,F0upp, color='r')
+    plt.fill_between(Z,F0lowpole,F0upppole, color='b',alpha=0.4)
+    plt.legend()
+    plt.xlabel('z',fontsize=30)
+    plt.ylabel(r'$f_0$',fontsize=30)
+    plt.axes().tick_params(labelright=True,which='both',width=2)
+    plt.axes().tick_params(which='major',length=15)
+    plt.axes().tick_params(which='minor',length=8)
+    plt.axes().yaxis.set_ticks_position('both')
+    plt.axes().xaxis.set_major_locator(MultipleLocator(0.1))
+    plt.axes().xaxis.set_minor_locator(MultipleLocator(0.01))
+    plt.axes().yaxis.set_major_locator(MultipleLocator(0.5))
+    plt.axes().yaxis.set_minor_locator(MultipleLocator(0.1))
+    plt.axes().set_xlim([Zmax,0])
+    plt.savefig('Extraps/f0')
+
+
+    
+    plt.figure(8)
+    Fit = F
+    for i , mass in enumerate(Fit['masses']):
+        xmean = [] 
+        xerr = [] 
+        ymean = [] 
+        yerr = []
+        col = cols[i]
+        for twist in Fit['twists']:
+            datatag = '{0}_m{1}_tw{2}'.format(Fit['conf'],mass,twist)
+            if 'plus{0}'.format(datatag) in f:
+                xmean.append(prior['z_{0}'.format(datatag)].mean)
+                ymean.append(f['plus{0}'.format(datatag)].mean)
+                xerr.append(prior['z_{0}'.format(datatag)].sdev)
+                yerr.append(f['plus{0}'.format(datatag)].sdev)
+        plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, mfc='none')
+        plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, fmt='o',ms=12,mfc='none',label=('{0}_m{1}'.format(Fit['conf'],mass)))
+    Fit = SF
+    for i , mass in enumerate(Fit['masses']):
+        xmean = [] 
+        xerr = [] 
+        ymean = [] 
+        yerr = []
+        col = cols[4+i]
+        for twist in Fit['twists']:
+            datatag = '{0}_m{1}_tw{2}'.format(Fit['conf'],mass,twist)
+            if 'plus{0}'.format(datatag) in f:
+                xmean.append(prior['z_{0}'.format(datatag)].mean)
+                ymean.append(f['plus{0}'.format(datatag)].mean)
+                xerr.append(prior['z_{0}'.format(datatag)].sdev)
+                yerr.append(f['plus{0}'.format(datatag)].sdev)
+        plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, mfc='none',linestyle='--')
+        plt.errorbar(xmean, ymean, xerr=xerr, yerr=yerr, color=col, fmt='^',ms=12,mfc='none',label=('{0}_m{1}'.format(Fit['conf'],mass)))
+    plt.plot(Z,Fplusmeanpole, color='r')
+    #plt.plot(Z,Fplusupp, color='g')
+    plt.fill_between(Z,Fpluslowpole,Fplusupppole, color='r',alpha=0.4)
+    plt.legend()
+    plt.xlabel('z',fontsize=30)
+    plt.ylabel(r'$f_{+}$',fontsize=30)
+    plt.axes().tick_params(labelright=True,which='both',width=2)
+    plt.axes().tick_params(which='major',length=15)
+    plt.axes().tick_params(which='minor',length=8)
+    plt.axes().yaxis.set_ticks_position('both')
+    plt.axes().xaxis.set_major_locator(MultipleLocator(0.1))
+    plt.axes().xaxis.set_minor_locator(MultipleLocator(0.01))
+    plt.axes().yaxis.set_major_locator(MultipleLocator(0.5))
+    plt.axes().yaxis.set_minor_locator(MultipleLocator(0.1))
+    plt.axes().set_xlim([Zmax,0])
+    plt.savefig('Extraps/fplus')
     return()
 
 
 
 
 def plot_results(Metasphys,p,x,prior,f):
+    nopts = 100
     a = collections.OrderedDict()
     a['0'] = [0]*N
     a['plus'] = [0]*N
@@ -379,37 +484,43 @@ def plot_results(Metasphys,p,x,prior,f):
     #MBs0 = gv.gvar('5.36688(17)') + gv.gvar('0.3471(73)')
     MBsstarphys = gv.gvar('5.4158(15)')
     #p = gv.load(filename)
-    F0meanpole = np.zeros((100))
-    Fplusmeanpole = np.zeros((100))
-    F0upppole = np.zeros((100))
-    F0lowpole = np.zeros((100))
-    Fplusupppole = np.zeros((100))
-    Fpluslowpole = np.zeros((100))
-    F0mean = np.zeros((100))
-    Fplusmean = np.zeros((100))
-    F0upp= np.zeros((100))
-    F0low= np.zeros((100))
-    Fplusupp = np.zeros((100))
-    Fpluslow = np.zeros((100))
-    qsq = []
-    qsqmean = []
+    F0meanpole = np.zeros((nopts))
+    Fplusmeanpole = np.zeros((nopts))
+    F0upppole = np.zeros((nopts))
+    F0lowpole = np.zeros((nopts))
+    Fplusupppole = np.zeros((nopts))
+    Fpluslowpole = np.zeros((nopts))
+    F0mean = np.zeros((nopts))
+    Fplusmean = np.zeros((nopts))
+    F0upp= np.zeros((nopts))
+    F0low= np.zeros((nopts))
+    Fplusupp = np.zeros((nopts))
+    Fpluslow = np.zeros((nopts))
+    Z = []
+    Zmean = []
     #qsqmax = 26
     qsqmax = (MBsphys-Metasphys)**2
     tplus = (MBsphys+Metasphys)**2
     zmax = ((gv.sqrt(tplus-qsqmax)-gv.sqrt(tplus))/(gv.sqrt(tplus-qsqmax)+gv.sqrt(tplus))).mean
-    Z = np.linspace(zmax,0,100)
+    Zmax=zmax
+    qsq = np.linspace(0,qsqmax.mean,nopts)
+    #print('qsq',qsq)
     #p['LQCD'] = 0.5
     p['LQCD'] = p['LQCD_F']/F['a']
     #print(gv.evalcorr([p['LQCD'],F['a']]))
     plt.figure(3)
     
-    for j in range(len(Z)):
+    for j in range(len(qsq)):
         f0physpole = 0
         f0phys = 0
         fplusphyspole = 0
         fplusphys = 0
-        qsq.append((1-((1+Z[j])/(1-Z[j]))**2)*tplus)
-        qsqmean.append(((1-((1+Z[j])/(1-Z[j]))**2)*tplus).mean)
+        if qsq[j] == 0.0:
+            Z.append(0)
+            Zmean.append(0)
+        else:
+            Z.append((gv.sqrt(tplus-qsq[j])-gv.sqrt(tplus))/(gv.sqrt(tplus-qsq[j])+gv.sqrt(tplus)))
+            Zmean.append(Z[j].mean)       
         for n in range(N):
             a['0'][n] = 0
             a['plus'][n] = 0
@@ -420,13 +531,18 @@ def plot_results(Metasphys,p,x,prior,f):
                 else:
                     a['0'][n] += p['0d'][i][0][0][n] * (p['LQCD']/MBsphys)**i
                     a['plus'][n] += p['plusd'][i][0][0][n] * (p['LQCD']/MBsphys)**i 
-                    
-            f0physpole += (1/(1 - qsq[j]/(MBs0**2))) * Z[j]**n * a['0'][n]
-            f0phys +=  Z[j]**n * a['0'][n]
-            fplusphyspole += (1/(1 - qsq[j]/(MBsstarphys**2))) * (Z[j]**n - (n/N) * (-1)**(n-N) * Z[j]**N) * a['plus'][n]
-            fplusphys += (Z[j]**n - (n/N) * (-1)**(n-N) * Z[j]**N) * a['plus'][n]
-        if j == 99:
-            print('$f_0(0)$:',f0physpole)
+            if n == 0:
+                f0physpole += (1/(1 - qsq[j]/(MBs0**2))) * a['0'][n]
+                f0phys +=  a['0'][n]
+                fplusphyspole += (1/(1 - qsq[j]/(MBsstarphys**2))) * a['plus'][n]
+                fplusphys +=  a['plus'][n]
+            else:
+                f0physpole += (1/(1 - qsq[j]/(MBs0**2))) * Z[j]**n * a['0'][n]
+                f0phys +=  Z[j]**n * a['0'][n]
+                fplusphyspole += (1/(1 - qsq[j]/(MBsstarphys**2))) * (Z[j]**n - (n/N) * (-1)**(n-N) * Z[j]**N) * a['plus'][n]
+                fplusphys += (Z[j]**n - (n/N) * (-1)**(n-N) * Z[j]**N) * a['plus'][n]
+        if qsq[j] == 0.0:
+            print('f_0(0):',f0physpole)
             if AddRho:               
                 inputs = {'d0000':prior['0d'][0][0][0][0],'d1000':prior['0d'][1][0][0][0],'d1000':prior['0d'][1][0][0][0],'d2000':prior['0d'][2][0][0][0],'d0001':prior['0d'][0][0][0][1],'d1001':prior['0d'][1][0][0][1],'d1001':prior['0d'][1][0][0][1],'d2001':prior['0d'][2][0][0][1],'d0002':prior['0d'][0][0][0][2],'d1002':prior['0d'][1][0][0][2],'d1002':prior['0d'][1][0][0][2],'d2002':prior['0d'][2][0][0][2],'rho0':prior['0rho'][0],'rho1':prior['0rho'][1],'rho2':prior['0rho'][2],'data':f}
                 
@@ -441,7 +557,7 @@ def plot_results(Metasphys,p,x,prior,f):
         F0meanpole[j] = f0physpole.mean
         F0upppole[j] = f0physpole.mean + f0physpole.sdev
         F0lowpole[j] = f0physpole.mean - f0physpole.sdev
-        
+
         Fplusmean[j] = fplusphys.mean
         Fplusupp[j] = fplusphys.mean + fplusphys.sdev
         Fpluslow[j] = fplusphys.mean - fplusphys.sdev
@@ -449,36 +565,37 @@ def plot_results(Metasphys,p,x,prior,f):
         Fplusmeanpole[j] = fplusphyspole.mean
         Fplusupppole[j] = fplusphyspole.mean + fplusphyspole.sdev
         Fpluslowpole[j] = fplusphyspole.mean - fplusphyspole.sdev
-    plt.plot(Z,F0meanpole, color='b',label='$f_0$')
+    plt.plot(Zmean,F0meanpole, color='b',label='$f_0$')
     #plt.plot(Z,F0mean, color='b',linestyle='--',label='$f_0$ no pole')
-    plt.fill_between(Z,F0lowpole,F0upppole, color='b',alpha=0.6)
-    plt.xlabel('z',fontsize=20)
+    plt.fill_between(Zmean,F0lowpole,F0upppole, color='b',alpha=0.4)
+    plt.xlabel('z',fontsize=30)
     #plt.ylabel('f',fontsize=20)
-    plt.plot(Z,Fplusmeanpole, color='r',label='$f_+$')
+    plt.plot(Zmean,Fplusmeanpole, color='r',label='$f_+$')
     #plt.plot(Z,Fplusmean, color='r',linestyle='--',label='$f_+$ no pole')
-    plt.fill_between(Z,Fpluslowpole,Fplusupppole, color='r', alpha=0.6)
-    plt.legend()
+    plt.fill_between(Zmean,Fpluslowpole,Fplusupppole, color='r', alpha=0.4)
+    plt.text(-0.20,1.0,'$f_0(z)$',fontsize=30)
+    plt.text(-0.07,0.9,'$f_+(z)$',fontsize=30)
     #plt.ylabel('f',fontsize=20)
     plt.axes().tick_params(labelright=True,which='both',width=2)
     plt.axes().tick_params(which='major',length=15)
     plt.axes().tick_params(which='minor',length=8)
     plt.axes().yaxis.set_ticks_position('both')
-    plt.axes().xaxis.set_major_locator(MultipleLocator(5))
-    plt.axes().xaxis.set_minor_locator(MultipleLocator(1))
+    plt.axes().xaxis.set_major_locator(MultipleLocator(0.05))
+    plt.axes().xaxis.set_minor_locator(MultipleLocator(0.01))
     plt.axes().yaxis.set_major_locator(MultipleLocator(0.5))
     plt.axes().yaxis.set_minor_locator(MultipleLocator(0.1))
     plt.axes().set_xlim([zmax,0])
-    plt.axes().set_ylim([0,3.3])
+    #plt.axes().set_ylim([0,3.3])
 
     plt.figure(4)
-    plt.plot(qsqmean,F0meanpole, color='b',label='$f_0$')
+    plt.plot(qsq,F0meanpole, color='b',label='$f_0$')
     #plt.plot(qsqmean,F0mean, color='b',linestyle='--',label='$f_0$ no pole')
-    plt.fill_between(qsqmean,F0lowpole,F0upppole, color='b',alpha=0.6)
-    plt.xlabel('$q^2(GeV^2)$',fontsize=20)
+    plt.fill_between(qsq,F0lowpole,F0upppole, color='b',alpha=0.4)
+    plt.xlabel('$q^2[GeV^2]$',fontsize=30)
     #plt.ylabel('f',fontsize=20)
-    plt.plot(qsqmean,Fplusmeanpole, color='r',label='$f_+$')
+    plt.plot(qsq,Fplusmeanpole, color='r',label='$f_+$')
     #plt.plot(qsqmean,Fplusmean, color='r',linestyle='--',label='$f_+$ no pole')
-    plt.fill_between(qsqmean,Fpluslowpole,Fplusupppole, color='r',alpha=0.6)
+    plt.fill_between(qsq,Fpluslowpole,Fplusupppole, color='r',alpha=0.4)
     plt.axes().tick_params(labelright=True,which='both',width=2)
     plt.axes().tick_params(which='major',length=15)
     plt.axes().tick_params(which='minor',length=8)
@@ -488,38 +605,41 @@ def plot_results(Metasphys,p,x,prior,f):
     plt.axes().yaxis.set_major_locator(MultipleLocator(0.5))
     plt.axes().yaxis.set_minor_locator(MultipleLocator(0.1))
     plt.axes().set_xlim([0,qsqmax.mean])
-    plt.axes().set_ylim([0,3.3])    
-    plt.legend()
+    #plt.axes().set_ylim([0,3.3])    
+    plt.text(19,1.0,'$f_0(q^2)$',fontsize=30)
+    plt.text(10,1.0,'$f_+(q^2)$',fontsize=30)
 
     ####################################################### M_h plots ###############
-    Mh = np.linspace(MDsphys.mean,MBsphys.mean,100)
+    lower = MDsphys.mean
+    upper = MBsphys.mean
+    Mh = np.linspace(lower,upper,nopts)
     a = collections.OrderedDict()
     a['0'] = [0]*N
     a['plus'] = [0]*N
-    fplusqmaxmean = np.zeros((100))
-    fplusqmaxupp = np.zeros((100))
-    fplusqmaxlow = np.zeros((100))
-    f0qmaxmean = np.zeros((100))
-    f0qmaxupp = np.zeros((100))
-    f0qmaxlow = np.zeros((100))
-    f0q0mean = np.zeros((100))
-    f0q0upp = np.zeros((100))
-    f0q0low = np.zeros((100))
-    fplusq0mean = np.zeros((100))
-    fplusq0upp = np.zeros((100))
-    fplusq0low = np.zeros((100))
-    invbetamean = np.zeros((100))
-    invbetaupp = np.zeros((100))
-    invbetalow = np.zeros((100))
-    deltamean = np.zeros((100))
-    deltaupp =np.zeros((100))
-    deltalow =np.zeros((100))
+    fplusqmaxmean = np.zeros((nopts))
+    fplusqmaxupp = np.zeros((nopts))
+    fplusqmaxlow = np.zeros((nopts))
+    f0qmaxmean = np.zeros((nopts))
+    f0qmaxupp = np.zeros((nopts))
+    f0qmaxlow = np.zeros((nopts))
+    f0q0mean = np.zeros((nopts))
+    f0q0upp = np.zeros((nopts))
+    f0q0low = np.zeros((nopts))
+    fplusq0mean = np.zeros((nopts))
+    fplusq0upp = np.zeros((nopts))
+    fplusq0low = np.zeros((nopts))
+    invbetamean = np.zeros((nopts))
+    invbetaupp = np.zeros((nopts))
+    invbetalow = np.zeros((nopts))
+    deltamean = np.zeros((nopts))
+    deltaupp =np.zeros((nopts))
+    deltalow =np.zeros((nopts))
     for j in range(len(Mh)):
         tpl =(Mh[j]+Metasphys)**2
         MHs0 = Mh[j] + Del
         MHsstar = Mh[j] + x/Mh[j]
         qsqmax = (Mh[j]-Metasphys)**2
-        zmax = ((gv.sqrt(tpl-qsqmax)-gv.sqrt(tpl))/(gv.sqrt(tpl-qsqmax)+gv.sqrt(tpl))).mean
+        zmax = ((gv.sqrt(tpl-qsqmax)-gv.sqrt(tpl))/(gv.sqrt(tpl-qsqmax)+gv.sqrt(tpl)))
         f0qmax = 0
         fplusqmax = 0
         for n in range(N):
@@ -532,9 +652,13 @@ def plot_results(Metasphys,p,x,prior,f):
                 else:
                     a['0'][n] +=  p['0d'][i][0][0][n] * (p['LQCD']/Mh[j])**i 
                     a['plus'][n] += p['plusd'][i][0][0][n] * (p['LQCD']/Mh[j])**i 
-                    
-            f0qmax += (1/(1 - qsqmax/(MHs0**2))) * zmax**n * a['0'][n]
-            fplusqmax += (1/(1 - qsqmax/(MHsstar**2))) * (zmax**n - (n/N) * (-1)**(n-N) * zmax**N) * a['plus'][n]
+
+            if n==0:
+                f0qmax += (1/(1 - qsqmax/(MHs0**2))) * a['0'][n]
+                fplusqmax += (1/(1 - qsqmax/(MHsstar**2))) * a['plus'][n]
+            else:
+                f0qmax += (1/(1 - qsqmax/(MHs0**2))) * zmax**n * a['0'][n]
+                fplusqmax += (1/(1 - qsqmax/(MHsstar**2))) * (zmax**n - (n/N) * (-1)**(n-N) * zmax**N) * a['plus'][n]
         f0q0 =  a['0'][0]
         fplusq0 = a['plus'][0]
         #print(gv.evalcorr([Metasphys,Metasphys]))
@@ -543,8 +667,12 @@ def plot_results(Metasphys,p,x,prior,f):
         
         #invbeta = (Metasphys**2-Mh[j]**2)/(fplusq0*2*tpl) * ( a['0'][0]/(MHs0**2) + a['0'][1])
         #delta = 1-((Metasphys**2-Mh[j]**2)/fplusq0 * (1/(2*tpl)) * (a['plus'][0]/MHsstar**2 - a['0'][0]/MHs0**2 + a['plus'][1] - a['0'][1]))
-        invbeta = (Mh[j]**2-Metasphys**2) * ( 1/(MHs0**2) - a['0'][1]/(2*tpl*a['0'][0]))
-        delta = 1-((Mh[j]**2-Metasphys**2) * (1/MHsstar**2 - 1/MHs0**2 - a['plus'][1]/(2*tpl*a['plus'][0]) + a['0'][1]/(2*tpl*a['0'][0])))
+        invbeta = (Mh[j]**2-Metasphys**2) * ( 1/(MHsstar**2) - a['plus'][1]/(4*tpl*a['plus'][0]))
+        delta = 1-((Mh[j]**2-Metasphys**2) * (1/MHsstar**2 - 1/MHs0**2 - a['plus'][1]/(4*tpl*a['plus'][0]) + a['0'][1]/(4*tpl*a['0'][0])))
+        if Mh[j] == MBsphys.mean:
+            print('f+ gradient =', invbeta*a['plus'][0]/(Mh[j]**2-Metasphys**2))
+            print('f+ gradient- f0 gradient =', (1-delta)*a['plus'][0]/(Mh[j]**2-Metasphys**2))
+            
         f0qmaxmean[j] = f0qmax.mean
         f0qmaxupp[j] = f0qmax.mean + f0qmax.sdev
         f0qmaxlow[j] = f0qmax.mean - f0qmax.sdev
@@ -569,18 +697,20 @@ def plot_results(Metasphys,p,x,prior,f):
         deltaupp[j] = delta.mean + delta.sdev
         deltalow[j] = delta.mean - delta.sdev
         
-    plt.figure()
+    plt.figure(5)
     plt.plot(Mh,f0qmaxmean, color='b',label='$f_0(q^2_{max})$')
-    plt.fill_between(Mh,f0qmaxupp,f0qmaxlow, color='b',alpha=0.6)
+    plt.fill_between(Mh,f0qmaxupp,f0qmaxlow, color='b',alpha=0.4)
     plt.plot(Mh,fplusqmaxmean, color='r',label='$f_+(q^2_{max})$')
-    plt.fill_between(Mh,fplusqmaxupp,fplusqmaxlow, color='r',alpha=0.6)
+    plt.fill_between(Mh,fplusqmaxupp,fplusqmaxlow, color='r',alpha=0.4)
     plt.plot(Mh,f0q0mean, color='k',label='$f_0(0)$')
-    plt.fill_between(Mh,f0q0upp,f0q0low, color='k',alpha=0.6)
+    plt.fill_between(Mh,f0q0upp,f0q0low, color='k',alpha=0.4)
     #plt.plot(Mh,fplusq0mean, color='purple',label='$f_+(0)$')
     #plt.fill_between(Mh,fplusq0upp,fplusq0low, color='purple',alpha=0.6)
-    plt.xlabel('$M_h[GeV]$',fontsize=20)
+    plt.xlabel(r'$M_{H_s}[GeV]$',fontsize=30)
     #plt.ylabel('$f$',fontsize=20)
-    plt.legend()
+    plt.text(2.2,2.0,'$f_+(q^2_{max})$',fontsize=30)
+    plt.text(4.2,1.1,'$f_0(q^2_{max})$',fontsize=30)
+    plt.text(2.2,0.4,'$f_0(0)$',fontsize=30)
     plt.axes().tick_params(labelright=True,which='both',width=2)
     plt.axes().tick_params(which='major',length=15)
     plt.axes().tick_params(which='minor',length=8)
@@ -589,18 +719,23 @@ def plot_results(Metasphys,p,x,prior,f):
     plt.axes().xaxis.set_minor_locator(MultipleLocator(0.2))
     plt.axes().yaxis.set_major_locator(MultipleLocator(0.5))
     plt.axes().yaxis.set_minor_locator(MultipleLocator(0.1))
-    plt.axes().set_xlim([MDsphys.mean,MBsphys.mean])
-    plt.axes().set_ylim([0.2,3.3]) 
+    plt.plot([lower,lower],[-10,10],'k--',lw=1)
+    plt.text(lower+0.01,0.1,'$M_{D_s}$',fontsize=20)
+    plt.plot([upper,upper],[-10,10],'k--',lw=1)
+    plt.text(upper+0.01,0.1,'$M_{B_s}$',fontsize=20)
+    #plt.axes().set_xlim([lower,upper])
+    plt.axes().set_ylim([0,3.3]) 
 
-    plt.figure()
+    plt.figure(6)
 
-    plt.plot(Mh,invbetamean, color='b',label=r'$\beta^{-1}$')
-    plt.fill_between(Mh,invbetaupp,invbetalow, color='b',alpha=0.6)
+    plt.plot(Mh,invbetamean, color='b')
+    plt.fill_between(Mh,invbetaupp,invbetalow, color='b',alpha=0.4)
     plt.plot(Mh,deltamean, color='r',label='$\delta$')
-    plt.fill_between(Mh,deltaupp,deltalow, color='r',alpha=0.6)
-    plt.xlabel('$M_h[GeV]$',fontsize=20)
+    plt.fill_between(Mh,deltaupp,deltalow, color='r',alpha=0.4)
+    plt.xlabel(r'$M_{H_s}[GeV]$',fontsize=30)
     #plt.ylabel('$f$',fontsize=20)
-    plt.legend()
+    plt.text(3,1.7,r'$\beta^{-1}$',fontsize=30)
+    plt.text(4,0.3,r'$\delta$',fontsize=30)
     plt.axes().tick_params(labelright=True,which='both',width=2)
     plt.axes().tick_params(which='major',length=15)
     plt.axes().tick_params(which='minor',length=8)
@@ -609,12 +744,16 @@ def plot_results(Metasphys,p,x,prior,f):
     plt.axes().xaxis.set_minor_locator(MultipleLocator(0.2))
     plt.axes().yaxis.set_major_locator(MultipleLocator(0.5))
     plt.axes().yaxis.set_minor_locator(MultipleLocator(0.1))
-    plt.axes().set_xlim([MDsphys.mean,MBsphys.mean])
-    #plt.axes().set_ylim([-2.2,0.2]) 
+    plt.plot([lower,lower],[-10,10],'k--',lw=1)
+    plt.text(lower+0.01,-0.7,'$M_{D_s}$',fontsize=20)
+    plt.plot([upper,upper],[-10,10],'k--',lw=1)
+    plt.text(upper+0.01,-0.7,'$M_{B_s}$',fontsize=20)
+    #plt.axes().set_xlim([lower,upper])
+    plt.axes().set_ylim([-0.8,2.5]) 
     
 
     
-    return(Z,qsq,MBsphys,MBsstarphys,F0mean,F0upp,F0low,Fplusmean,Fplusupp,Fpluslow)
+    return(Zmean,Zmax,qsq,MBsphys,MBsstarphys,F0mean,F0upp,F0low,Fplusmean,Fplusupp,Fpluslow,F0meanpole,F0upppole,F0lowpole,Fplusmeanpole,Fplusupppole,Fpluslowpole)
 
 #plot_results()
 
@@ -703,9 +842,13 @@ def findDelta():
     return()
 
 
-
+#AddRho = True
+#main()
+#AddRho = False
 main()
 
+if SHOWPLOTS:
+    plt.show()
 
 #findDelta()
 
