@@ -22,16 +22,16 @@ F['m_s'] = '0.0376'
 F['Ts'] = [14,17,20]
 F['tp'] = 96
 F['L'] = 32
-F['tminsG'] = [3,3,3,3]
-F['tmaxesG'] = [45,45,45,45]
+#F['tminsG'] = [3,3,3,3]
+F['tmaxesG'] = [48,48,48,48]
+F['tmaxesNG'] = [48,48,48,48]
+F['tmaxesD'] = [46,45,45,42,42,37]
 F['tminG'] = 3
-#F['tminG'] = 3
 F['tminNG'] = 3
-F['tminD'] = 5
-F['tmaxG'] = 45
+F['tminD'] = 3                                # 3 for 5 twists, 5 for first 4
 #F['tmaxG'] = 45                              #48 is upper limit, ie goes up to 47
-F['tmaxNG'] = 47
-F['tmaxD'] = 48
+#F['tmaxNG'] = 47
+#F['tmaxD'] = 48
 F['Stmin'] = 2
 F['Vtmin'] = 1
 F['an'] = '0.1(1)'
@@ -59,12 +59,15 @@ SF['m_s'] = '0.0234'
 SF['Ts'] = [20,25,30]
 SF['tp'] = 144
 SF['L'] = 48
+SF['tmaxesG'] = [72,72,72,72]
+SF['tmaxesNG'] = [72,72,72,72]
+SF['tmaxesD'] = [72,72,72,36,35]
 SF['tminG'] = 6
 SF['tminNG'] = 7
-SF['tminD'] = 7
-SF['tmaxG'] = 67                             #72 is upper limit, ie includes all data 
-SF['tmaxNG'] = 71
-SF['tmaxD'] = 71                             #72 is upper limit, ie goes up to 47
+SF['tminD'] = 9
+#SF['tmaxG'] = 67                             #72 is upper limit, ie includes all data 
+#SF['tmaxNG'] = 71
+#SF['tmaxD'] = 71                             #72 is upper limit, ie goes up to 47
 SF['Stmin'] = 2
 SF['Vtmin'] = 2
 SF['an'] = '0.1(1)'
@@ -114,13 +117,13 @@ DoFit = True
 FitAll = False
 TestData = False
 Fit = F                                               # Choose to fit F, SF or UF
-FitMasses = [0]#,1,2,3]                                 # Choose which masses to fit
-FitTwists = [0,1,2,3,4]                               # Choose which twists to fit
+FitMasses = [0,1,2,3]                                 # Choose which masses to fit
+FitTwists = [0,1,2,3,4,5]                               # Choose which twists to fit
 FitTs = [0,1,2]
-FitCorrs = ['G']#,'NG','D','S','V']  # Choose which corrs to fit ['G','NG','D','S','V']
+FitCorrs = ['G','NG','D','S','V']  # Choose which corrs to fit ['G','NG','D','S','V']
 Chained = False
 CorrBayes = False
-SaveFit = False
+SaveFit = True
 svdnoise = False
 priornoise = False
 ResultPlots = False         # Tell what to plot against, "Q", "N","Log(GBF)", False
@@ -137,13 +140,19 @@ def make_params(FitMasses,FitTwists,FitTs):
     ThreePts = collections.OrderedDict()
     masses = []
     twists = []
+    tmaxesG = []
+    tmaxesNG = []
+    tmaxesD = []
     Ts = []    
     m_s = Fit['m_s']
     filename = Fit['filename']          
     for i in FitMasses:
         masses.append(Fit['masses'][i])
+        tmaxesG.append(Fit['tmaxesG'][i])
+        tmaxesNG.append(Fit['tmaxesNG'][i])
     for j in FitTwists:
         twists.append(Fit['twists'][j])
+        tmaxesD.append(Fit['tmaxesD'][j])
     for k in FitTs:
         Ts.append(Fit['Ts'][k])
     for twist in Fit['twists']:
@@ -156,7 +165,7 @@ def make_params(FitMasses,FitTwists,FitTs):
                 ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)] = Fit['threePtTag'][Fit['twists'].index(twist)].format('current-scalar',T,m_s,mass,twist)
                 ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)] = Fit['threePtTag'][Fit['twists'].index(twist)].format('current-vector',T,m_s,mass,twist)
                 
-    return(TwoPts,ThreePts,masses,twists,Ts)
+    return(TwoPts,ThreePts,masses,twists,Ts,tmaxesG,tmaxesNG,tmaxesD)
 
 
 
@@ -426,9 +435,9 @@ def make_models():
     tminG = Fit['tminG']
     tminNG = Fit['tminNG']
     tminD = Fit['tminD']
-    tmaxG = Fit['tmaxG']
-    tmaxNG = Fit['tmaxNG']
-    tmaxD = Fit['tmaxD']
+    #tmaxG = Fit['tmaxG']
+    #tmaxNG = Fit['tmaxNG']
+    #tmaxD = Fit['tmaxD']
     Stmin = Fit['Stmin']
     Vtmin = Fit['Vtmin']
     tp = Fit['tp']
@@ -436,20 +445,20 @@ def make_models():
     Sthreepts = []
     Vthreepts = []
     if 'G' in FitCorrs:
-        for mass in masses:        
+        for i,mass in enumerate(masses):        
             GCorrelator = copy.deepcopy(TwoPts['Gm{0}'.format(mass)])
-            twopts.append(cf.Corr2(datatag=GCorrelator, tp=tp, tmin=tminG, tmax=tmaxG, a=('{0}:a'.format(GCorrelator), 'o{0}:a'.format(GCorrelator)), b=('{0}:a'.format(GCorrelator), 'o{0}:a'.format(GCorrelator)), dE=('dE:{0}'.format(GCorrelator), 'dE:o{0}'.format(GCorrelator)),s=(1.,-1.)))
+            twopts.append(cf.Corr2(datatag=GCorrelator, tp=tp, tmin=tminG, tmax=tmaxesG[i], a=('{0}:a'.format(GCorrelator), 'o{0}:a'.format(GCorrelator)), b=('{0}:a'.format(GCorrelator), 'o{0}:a'.format(GCorrelator)), dE=('dE:{0}'.format(GCorrelator), 'dE:o{0}'.format(GCorrelator)),s=(1.,-1.)))
     if 'NG' in FitCorrs:
-        for mass in masses:
+        for i,mass in enumerate(masses):
             NGCorrelator = copy.deepcopy(TwoPts['NGm{0}'.format(mass)])
-            twopts.append(cf.Corr2(datatag=NGCorrelator, tp=tp, tmin=tminNG, tmax=tmaxNG, a=('{0}:a'.format(NGCorrelator), 'o{0}:a'.format(NGCorrelator)), b=('{0}:a'.format(NGCorrelator), 'o{0}:a'.format(NGCorrelator)), dE=('dE:{0}'.format(NGCorrelator), 'dE:o{0}'.format(NGCorrelator)),s=(1.,-1.)))
+            twopts.append(cf.Corr2(datatag=NGCorrelator, tp=tp, tmin=tminNG, tmax=tmaxesNG[i], a=('{0}:a'.format(NGCorrelator), 'o{0}:a'.format(NGCorrelator)), b=('{0}:a'.format(NGCorrelator), 'o{0}:a'.format(NGCorrelator)), dE=('dE:{0}'.format(NGCorrelator), 'dE:o{0}'.format(NGCorrelator)),s=(1.,-1.)))
     if 'D' in FitCorrs:
-        for twist in twists:
+        for i,twist in enumerate(twists):
             DCorrelator = copy.deepcopy(TwoPts['Dtw{0}'.format(twist)])
             if twist != '0':                
-                twopts.append(cf.Corr2(datatag=DCorrelator, tp=tp, tmin=tminD, tmax=tmaxD,a=('{0}:a'.format(DCorrelator), 'o{0}:a'.format(DCorrelator)), b=('{0}:a'.format(DCorrelator), 'o{0}:a'.format(DCorrelator)), dE=('dE:{0}'.format(DCorrelator), 'dE:o{0}'.format(DCorrelator)),s=(1.,-1.)))
+                twopts.append(cf.Corr2(datatag=DCorrelator, tp=tp, tmin=tminD, tmax=tmaxesD[i],a=('{0}:a'.format(DCorrelator), 'o{0}:a'.format(DCorrelator)), b=('{0}:a'.format(DCorrelator), 'o{0}:a'.format(DCorrelator)), dE=('dE:{0}'.format(DCorrelator), 'dE:o{0}'.format(DCorrelator)),s=(1.,-1.)))
             else:
-                twopts.append(cf.Corr2(datatag=DCorrelator, tp=tp, tmin=tminD,tmax=tmaxD, a=('{0}:a'.format(DCorrelator)), b=('{0}:a'.format(DCorrelator)), dE=('dE:{0}'.format(DCorrelator))))
+                twopts.append(cf.Corr2(datatag=DCorrelator, tp=tp, tmin=tminD,tmax=tmaxesD[i], a=('{0}:a'.format(DCorrelator)), b=('{0}:a'.format(DCorrelator)), dE=('dE:{0}'.format(DCorrelator))))
                 
     if 'S' in FitCorrs:
         for mass in masses:
@@ -504,7 +513,7 @@ def modelsandsvd(N):
     else:
         models = make_models()   
     print('Models made: ', models)
-    File = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}.pickle'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],Fit['tmaxG'],Fit['tmaxNG'],Fit['tmaxD'],Chained)
+    File = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}.pickle'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],tmaxesG,tmaxesNG,tmaxesD,Chained)
     if AutoSvd == True:        
         if os.path.isfile(File) == True:
             pickle_off = open(File,"rb")
@@ -513,7 +522,7 @@ def modelsandsvd(N):
             print('Used existing svdcut {0} times factor {1}:'.format(trueSvd,SvdFactor), svdcut)
         else:
             print('Calculating svd')
-            s = gv.dataset.svd_diagnosis(cf.read_dataset(filename), models=models)
+            s = gv.dataset.svd_diagnosis(cf.read_dataset(filename), models=models, nbstrap=20)
             s.plot_ratio(show=True)
             var = input("Hit enter to accept svd = {0}, or else type svd here:".format(s.svdcut))
             if var == '':
@@ -619,7 +628,7 @@ def main(Autoprior,data):
         Fitter = cf.CorrFitter(models=models, svdcut=svdcut, fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, fast=False, tol=(1e-6,0.0,0.0))
         cond = (lambda: Nexp <= 8) if FitAll else (lambda: GBF2 - GBF1 > 0.01)
         while cond():           
-            fname = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],Fit['tmaxG'],Fit['tmaxNG'],Fit['tmaxD'],Chained)            
+            fname = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],tmaxesG,tmaxesNG,tmaxesD,Chained)            
             p0 = load_p0(p0,Nexp,fname,TwoKeys,ThreeKeys)                    
             GBF1 = copy.deepcopy(GBF2)
             print('Making Prior')
@@ -1004,11 +1013,11 @@ if DoFit == True:
             FitMasses = [i]
             for j in range(5):                
                 FitTwists = [j]
-                TwoPts,ThreePts,masses,twists,Ts = make_params(FitMasses, FitTwists,FitTs)
+                TwoPts,ThreePts,masses,twists,Ts,tmaxesG,tmaxesNG,tmaxesD = make_params(FitMasses, FitTwists,FitTs)
                 main(Autoprior,data)
                             
     else:        
-        TwoPts,ThreePts,masses,twists,Ts = make_params(FitMasses,FitTwists,FitTs)
+        TwoPts,ThreePts,masses,twists,Ts,tmaxesG,tmaxesNG,tmaxesD = make_params(FitMasses,FitTwists,FitTs)
         if TestData == True:
             test_data()
         main(Autoprior,data)
