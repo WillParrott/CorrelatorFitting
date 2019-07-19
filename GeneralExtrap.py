@@ -14,7 +14,7 @@ from collections import defaultdict
 ################################## F PARAMETERS ##########################
 F = collections.OrderedDict()
 F['conf']='F'
-F['filename'] = 'Fits/F5_Q1.00_Nexp4_Stmin2_Vtmin1_svd0.00411_chi0.529'
+F['filename'] = 'Fits/F5_Q1.00_Nexp3_Stmin2_Vtmin1_svd0.00700_chi0.457'
 F['Masses'] = ['0.449','0.566','0.683','0.8']
 F['Twists'] = ['0','0.4281','1.282','2.141','2.570','2.993']
 F['m_s'] = '0.0376'
@@ -32,7 +32,7 @@ F['threePtTag'] = ['{0}.T{1}_m{2}_m{3}_m{2}','{0}.T{1}_m{2}_m{3}_m{2}_tw{4}','{0
 ######################## SF PARAMETERS ####################################
 SF = collections.OrderedDict()
 SF['conf']='SF'
-SF['filename'] = 'Fits/SF5_Q1.00_Nexp3_Stmin2_Vtmin2_svd0.05000_chi0.118'
+SF['filename'] = 'Fits/SF5_Q1.00_Nexp3_Stmin2_Vtmin2_svd0.00400_chi0.233'
 SF['Masses'] = ['0.274','0.450','0.6','0.8']
 SF['Twists'] = ['0','1.261','2.108','2.946','3.624']
 SF['m_s'] = '0.0234'
@@ -51,10 +51,10 @@ SF['threePtTag'] = ['{0}.T{1}_m{2}_m{3}_m{2}','{0}.T{1}_m{2}_m{3}_m{2}_tw{4}','{
 ############################################################################
 Fits = [F,SF]                                         # Choose to fit F, SF or UF
 FMasses = [0,1,2,3]                                     # Choose which masses to fit
-FTwists = [0,1,2,3,4]
+FTwists = [5]#0,1,2,3,4]#,5]
 SFMasses = [0,1,2,3]
 SFTwists = [0,1,2,3,4]
-AddRho = True
+AddRho = False
 svdnoise = False
 priornoise = False
 Pri = '0.00(2.00)'
@@ -108,8 +108,9 @@ def get_results(Fit):
         Fit['M_NGo_m{0}'.format(mass)] = p['dE:o{0}'.format(Fit['NGm{0}'.format(mass)])][0]
             
         for twist in Fit['twists']:
-            Fit['Sm{0}_tw{1}'.format(mass,twist)] = 2*2*gv.sqrt(Fit['E_D_tw{0}'.format(twist)]*Fit['M_G_m{0}'.format(mass)])*p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0]
-            Fit['Vm{0}_tw{1}'.format(mass,twist)] = 2*2*gv.sqrt(Fit['E_D_tw{0}'.format(twist)]*Fit['M_G_m{0}'.format(mass)])*p['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0]
+            if 'SVnn_m{0}_tw{1}'.format(mass,twist) in p:
+                Fit['Sm{0}_tw{1}'.format(mass,twist)] = 2*2*gv.sqrt(Fit['E_D_tw{0}'.format(twist)]*Fit['M_G_m{0}'.format(mass)])*p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0]
+                Fit['Vm{0}_tw{1}'.format(mass,twist)] = 2*2*gv.sqrt(Fit['E_D_tw{0}'.format(twist)]*Fit['M_G_m{0}'.format(mass)])*p['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0]
     return()
 
 
@@ -132,21 +133,22 @@ def make_fs(Fit):
         Vec[mass] = collections.OrderedDict()
         Z_v = (float(mass) - float(Fit['m_s']))*Fit['Sm{0}_tw0'.format(mass)]/((Fit['M_G_m{0}'.format(mass)] - Fit['M_D_tw0'])*Fit['Vm{0}_tw0'.format(mass)]) 
         for twist in Fit['twists']:
-            delta = (float(mass) - float(Fit['m_s']))*(Fit['M_G_m{0}'.format(mass)]-Fit['E_D_tw{0}'.format(twist)])
-            qsq = Fit['M_G_m{0}'.format(mass)]**2 + Fit['M_D_tw{0}'.format(twist)]**2 - 2*Fit['M_G_m{0}'.format(mass)]*Fit['E_D_tw{0}'.format(twist)]
-            t = (Fit['M_G_m{0}'.format(mass)] + Fit['M_D_tw{0}'.format(twist)])**2
-            z = (gv.sqrt(t-qsq)-gv.sqrt(t))/(gv.sqrt(t-qsq)+gv.sqrt(t))           
-            if qsq.mean >= 0:
-                F0 = (float(mass) - float(Fit['m_s']))*(1/(Fit['M_G_m{0}'.format(mass)]**2 - Fit['M_D_tw{0}'.format(twist)]**2))*Fit['Sm{0}_tw{1}'.format(mass,twist)]               
-                F_0[mass][twist] = F0                    
-                qSq[mass][twist] = qsq                    
-                Z[mass][twist] = z
-                Sca[mass][twist] = Fit['Sm{0}_tw{1}'.format(mass,twist)]
-                Vec[mass][twist] = Fit['Vm{0}_tw{1}'.format(mass,twist)]           
-                A = Fit['M_G_m{0}'.format(mass)] + Fit['E_D_tw{0}'.format(twist)]
-                B = (Fit['M_G_m{0}'.format(mass)]**2 - Fit['M_D_tw{0}'.format(twist)]**2)*(Fit['M_G_m{0}'.format(mass)] - Fit['E_D_tw{0}'.format(twist)])/qsq           
-                if twist != '0':
-                    F_plus[mass][twist] = (1/(A-B))*(Z_v*Fit['Vm{0}_tw{1}'.format(mass,twist)] - B*F0)       
+            if 'Sm{0}_tw{1}'.format(mass,twist) in Fit:
+                delta = (float(mass) - float(Fit['m_s']))*(Fit['M_G_m{0}'.format(mass)]-Fit['E_D_tw{0}'.format(twist)])
+                qsq = Fit['M_G_m{0}'.format(mass)]**2 + Fit['M_D_tw{0}'.format(twist)]**2 - 2*Fit['M_G_m{0}'.format(mass)]*Fit['E_D_tw{0}'.format(twist)]
+                t = (Fit['M_G_m{0}'.format(mass)] + Fit['M_D_tw{0}'.format(twist)])**2
+                z = (gv.sqrt(t-qsq)-gv.sqrt(t))/(gv.sqrt(t-qsq)+gv.sqrt(t))           
+                if qsq.mean >= 0:
+                    F0 = (float(mass) - float(Fit['m_s']))*(1/(Fit['M_G_m{0}'.format(mass)]**2 - Fit['M_D_tw{0}'.format(twist)]**2))*Fit['Sm{0}_tw{1}'.format(mass,twist)]               
+                    F_0[mass][twist] = F0                    
+                    qSq[mass][twist] = qsq                    
+                    Z[mass][twist] = z
+                    Sca[mass][twist] = Fit['Sm{0}_tw{1}'.format(mass,twist)]
+                    Vec[mass][twist] = Fit['Vm{0}_tw{1}'.format(mass,twist)]           
+                    A = Fit['M_G_m{0}'.format(mass)] + Fit['E_D_tw{0}'.format(twist)]
+                    B = (Fit['M_G_m{0}'.format(mass)]**2 - Fit['M_D_tw{0}'.format(twist)]**2)*(Fit['M_G_m{0}'.format(mass)] - Fit['E_D_tw{0}'.format(twist)])/qsq           
+                    if twist != '0':
+                        F_plus[mass][twist] = (1/(A-B))*(Z_v*Fit['Vm{0}_tw{1}'.format(mass,twist)] - B*F0)       
         
     
     return(F_0,F_plus,qSq,Z)

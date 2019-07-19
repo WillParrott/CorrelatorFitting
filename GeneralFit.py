@@ -18,6 +18,7 @@ F['conf'] = 'F'
 F['filename'] = 'HstoEtasfine5Neg.gpl'
 F['masses'] = ['0.449','0.566','0.683','0.8']
 F['twists'] = ['0','0.4281','1.282','2.141','2.570','2.993']
+F['mtw'] = [[1,1,1,1,0,0],[1,1,1,1,1,0],[1,1,1,1,1,1],[1,1,1,1,1,1]]
 F['m_s'] = '0.0376'
 F['Ts'] = [14,17,20]
 F['tp'] = 96
@@ -55,6 +56,7 @@ SF['conf'] = 'SF'
 SF['filename'] = 'SFCopy.gpl'
 SF['masses'] = ['0.274','0.450','0.6','0.8']
 SF['twists'] = ['0','1.261','2.108','2.946','3.624']
+SF['mtw'] = [[1,1,1,0,0],[1,1,1,1,0],[1,1,1,1,1],[1,1,1,1,1]]
 SF['m_s'] = '0.0234'
 SF['Ts'] = [20,25,30]
 SF['tp'] = 144
@@ -118,9 +120,10 @@ FitAll = False
 TestData = False
 Fit = F                                               # Choose to fit F, SF or UF
 FitMasses = [0,1,2,3]                                 # Choose which masses to fit
-FitTwists = [0,1,2,3,4,5]                               # Choose which twists to fit
+FitTwists = [0,1,2,3,4]                               # Choose which twists to fit
 FitTs = [0,1,2]
 FitCorrs = ['G','NG','D','S','V']  # Choose which corrs to fit ['G','NG','D','S','V']
+FitAllTwists = False
 Chained = False
 CorrBayes = False
 SaveFit = True
@@ -128,8 +131,7 @@ svdnoise = False
 priornoise = False
 ResultPlots = False         # Tell what to plot against, "Q", "N","Log(GBF)", False
 AutoSvd = True
-SvdFactor = 1.0
-# Multiplies saved SVD 
+SvdFactor = 1.0                        # Multiplies saved SVD 
 Nmax = 7                               # Number of exp to fit nterm dictates which will not be marginalised 
                       
 ##############################################################
@@ -138,6 +140,7 @@ Nmax = 7                               # Number of exp to fit nterm dictates whi
 def make_params(FitMasses,FitTwists,FitTs):
     TwoPts = collections.OrderedDict()
     ThreePts = collections.OrderedDict()
+    qsqPos = collections.OrderedDict()
     masses = []
     twists = []
     tmaxesG = []
@@ -150,6 +153,11 @@ def make_params(FitMasses,FitTwists,FitTs):
         masses.append(Fit['masses'][i])
         tmaxesG.append(Fit['tmaxesG'][i])
         tmaxesNG.append(Fit['tmaxesNG'][i])
+        for j in FitTwists:
+            if FitAllTwists == True:
+                qsqPos['m{0}_tw{1}'.format(Fit['masses'][i],Fit['twists'][j])] = 1
+            else:    
+                qsqPos['m{0}_tw{1}'.format(Fit['masses'][i],Fit['twists'][j])] = Fit['mtw'][i][j]
     for j in FitTwists:
         twists.append(Fit['twists'][j])
         tmaxesD.append(Fit['tmaxesD'][j])
@@ -165,7 +173,7 @@ def make_params(FitMasses,FitTwists,FitTs):
                 ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)] = Fit['threePtTag'][Fit['twists'].index(twist)].format('current-scalar',T,m_s,mass,twist)
                 ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)] = Fit['threePtTag'][Fit['twists'].index(twist)].format('current-vector',T,m_s,mass,twist)
                 
-    return(TwoPts,ThreePts,masses,twists,Ts,tmaxesG,tmaxesNG,tmaxesD)
+    return(TwoPts,ThreePts,masses,twists,Ts,tmaxesG,tmaxesNG,tmaxesD,qsqPos)
 
 
 
@@ -181,7 +189,7 @@ def make_data(filename,N):
 
 
 def eff_calc():
-    T = Ts[0]
+    T = Ts[0]   #play with this. Maybe middle T is best?
     tp = Fit['tp']
     #Make this do plots
     M_effs = collections.OrderedDict()
@@ -404,27 +412,29 @@ def make_prior(N,M_eff,A_eff,V_eff,Autoprior):
     if 'S' in FitCorrs:
         for mass in masses: 
             for twist in twists:
-                prior['SVnn_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
-                prior['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean,loosener*V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean)
-                prior['SVno_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
-                prior['SVno_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
-                if twist != '0':                    
-                    prior['SVon_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
-                    prior['SVon_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
-                    prior['SVoo_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
-                    prior['SVoo_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
+                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                    prior['SVnn_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
+                    prior['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean,loosener*V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean)
+                    prior['SVno_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
+                    prior['SVno_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
+                    if twist != '0':                    
+                        prior['SVon_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
+                        prior['SVon_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
+                        prior['SVoo_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
+                        prior['SVoo_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
     if 'V' in FitCorrs:
         for mass in masses:
             for twist in twists:
-                prior['VVnn_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
-                prior['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(V_eff['Vm{0}_tw{1}'.format(mass,twist)].mean,loosener*V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean)
-                prior['VVno_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
-                prior['VVno_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
-                if twist != '0':                    
-                    prior['VVon_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
-                    prior['VVon_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
-                    prior['VVoo_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
-                    prior['VVoo_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
+                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                    prior['VVnn_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
+                    prior['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(V_eff['Vm{0}_tw{1}'.format(mass,twist)].mean,loosener*V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean)
+                    prior['VVno_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
+                    prior['VVno_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
+                    if twist != '0':                    
+                        prior['VVon_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
+                        prior['VVon_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
+                        prior['VVoo_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
+                        prior['VVoo_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
     return(prior)
 
 
@@ -466,11 +476,12 @@ def make_models():
             NGCorrelator = copy.deepcopy(TwoPts['NGm{0}'.format(mass)])
             for twist in twists:
                 DCorrelator = copy.deepcopy(TwoPts['Dtw{0}'.format(twist)])
-                for T in Ts:
-                    if twist != '0':
-                        Sthreepts.append(cf.Corr3(datatag=ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)], T=T, tmin=Stmin,  a=('{0}:a'.format(DCorrelator), 'o{0}:a'.format(DCorrelator)), dEa=('dE:{0}'.format(DCorrelator), 'dE:o{0}'.format(DCorrelator)), sa=(1,-1), b=('{0}:a'.format(GCorrelator), 'o{0}:a'.format(GCorrelator)), dEb=('dE:{0}'.format(GCorrelator), 'dE:o{0}'.format(GCorrelator)), sb=(1,-1), Vnn='SVnn_m'+str(mass)+'_tw'+str(twist), Vno='SVno_m'+str(mass)+'_tw'+str(twist), Von='SVon_m'+str(mass)+'_tw'+str(twist), Voo='SVoo_m'+str(mass)+'_tw'+str(twist)))
-                    else:
-                        Sthreepts.append(cf.Corr3(datatag=ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)], T=T, tmin=Stmin,  a=('{0}:a'.format(DCorrelator)), dEa=('dE:{0}'.format(DCorrelator)), b=('{0}:a'.format(GCorrelator), 'o{0}:a'.format(GCorrelator)), dEb=('dE:{0}'.format(GCorrelator), 'dE:o{0}'.format(GCorrelator)), sb=(1,-1), Vnn='SVnn_m'+str(mass)+'_tw'+str(twist), Vno='SVno_m'+str(mass)+'_tw'+str(twist)))
+                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                    for T in Ts:
+                        if twist != '0':
+                            Sthreepts.append(cf.Corr3(datatag=ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)], T=T, tmin=Stmin,  a=('{0}:a'.format(DCorrelator), 'o{0}:a'.format(DCorrelator)), dEa=('dE:{0}'.format(DCorrelator), 'dE:o{0}'.format(DCorrelator)), sa=(1,-1), b=('{0}:a'.format(GCorrelator), 'o{0}:a'.format(GCorrelator)), dEb=('dE:{0}'.format(GCorrelator), 'dE:o{0}'.format(GCorrelator)), sb=(1,-1), Vnn='SVnn_m'+str(mass)+'_tw'+str(twist), Vno='SVno_m'+str(mass)+'_tw'+str(twist), Von='SVon_m'+str(mass)+'_tw'+str(twist), Voo='SVoo_m'+str(mass)+'_tw'+str(twist)))
+                        else:
+                            Sthreepts.append(cf.Corr3(datatag=ThreePts['Sm{0}_tw{1}_T{2}'.format(mass,twist,T)], T=T, tmin=Stmin,  a=('{0}:a'.format(DCorrelator)), dEa=('dE:{0}'.format(DCorrelator)), b=('{0}:a'.format(GCorrelator), 'o{0}:a'.format(GCorrelator)), dEb=('dE:{0}'.format(GCorrelator), 'dE:o{0}'.format(GCorrelator)), sb=(1,-1), Vnn='SVnn_m'+str(mass)+'_tw'+str(twist), Vno='SVno_m'+str(mass)+'_tw'+str(twist)))
                         
     if 'V' in FitCorrs:
         for mass in masses:
@@ -478,11 +489,12 @@ def make_models():
             NGCorrelator = copy.deepcopy(TwoPts['NGm{0}'.format(mass)])
             for twist in twists:
                 DCorrelator = copy.deepcopy(TwoPts['Dtw{0}'.format(twist)])
-                for T in Ts:
-                    if twist != '0':
-                        Vthreepts.append(cf.Corr3(datatag=ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)], T=T, tmin=Vtmin, a=('{0}:a'.format(DCorrelator), 'o{0}:a'.format(DCorrelator)), dEa=('dE:{0}'.format(DCorrelator), 'dE:o{0}'.format(DCorrelator)), sa=(1,-1), b=('{0}:a'.format(NGCorrelator), 'o{0}:a'.format(NGCorrelator)), dEb=('dE:{0}'.format(NGCorrelator), 'dE:o{0}'.format(NGCorrelator)), sb=(1,-1), Vnn='VVnn_m'+str(mass)+'_tw'+str(twist), Vno='VVno_m'+str(mass)+'_tw'+str(twist), Von='VVon_m'+str(mass)+'_tw'+str(twist), Voo='VVoo_m'+str(mass)+'_tw'+str(twist)))
-                    else:
-                        Vthreepts.append(cf.Corr3(datatag=ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)], T=T, tmin=Vtmin, a=('{0}:a'.format(DCorrelator)), dEa=('dE:{0}'.format(DCorrelator)), b=('{0}:a'.format(NGCorrelator), 'o{0}:a'.format(NGCorrelator)), dEb=('dE:{0}'.format(NGCorrelator), 'dE:o{0}'.format(NGCorrelator)), sb=(1,-1), Vnn='VVnn_m'+str(mass)+'_tw'+str(twist), Vno='VVno_m'+str(mass)+'_tw'+str(twist)))
+                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                    for T in Ts:                    
+                        if twist != '0':
+                            Vthreepts.append(cf.Corr3(datatag=ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)], T=T, tmin=Vtmin, a=('{0}:a'.format(DCorrelator), 'o{0}:a'.format(DCorrelator)), dEa=('dE:{0}'.format(DCorrelator), 'dE:o{0}'.format(DCorrelator)), sa=(1,-1), b=('{0}:a'.format(NGCorrelator), 'o{0}:a'.format(NGCorrelator)), dEb=('dE:{0}'.format(NGCorrelator), 'dE:o{0}'.format(NGCorrelator)), sb=(1,-1), Vnn='VVnn_m'+str(mass)+'_tw'+str(twist), Vno='VVno_m'+str(mass)+'_tw'+str(twist), Von='VVon_m'+str(mass)+'_tw'+str(twist), Voo='VVoo_m'+str(mass)+'_tw'+str(twist)))
+                        else:
+                            Vthreepts.append(cf.Corr3(datatag=ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)], T=T, tmin=Vtmin, a=('{0}:a'.format(DCorrelator)), dEa=('dE:{0}'.format(DCorrelator)), b=('{0}:a'.format(NGCorrelator), 'o{0}:a'.format(NGCorrelator)), dEb=('dE:{0}'.format(NGCorrelator), 'dE:o{0}'.format(NGCorrelator)), sb=(1,-1), Vnn='VVnn_m'+str(mass)+'_tw'+str(twist), Vno='VVno_m'+str(mass)+'_tw'+str(twist)))
                         
     if Chained == True:            
         twopts = tuple(twopts)
@@ -513,7 +525,7 @@ def modelsandsvd(N):
     else:
         models = make_models()   
     print('Models made: ', models)
-    File = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}.pickle'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],tmaxesG,tmaxesNG,tmaxesD,Chained)
+    File = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}.pickle'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],tmaxesG,tmaxesNG,tmaxesD,Chained,FitAllTwists)
     if AutoSvd == True:        
         if os.path.isfile(File) == True:
             pickle_off = open(File,"rb")
@@ -622,13 +634,15 @@ def main(Autoprior,data):
     else:
         #print('Initial p0', p0)        
         Nexp = 3
+        if 'S' or 'V' in FitCorrs:
+            Nexp = 2
         GBF1 = -1e21
         GBF2 = -1e20
         models,svdcut = modelsandsvd('somenumber')
         Fitter = cf.CorrFitter(models=models, svdcut=svdcut, fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, fast=False, tol=(1e-6,0.0,0.0))
         cond = (lambda: Nexp <= 8) if FitAll else (lambda: GBF2 - GBF1 > 0.01)
         while cond():           
-            fname = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],tmaxesG,tmaxesNG,tmaxesD,Chained)            
+            fname = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],tmaxesG,tmaxesNG,tmaxesD,Chained,FitAllTwists)            
             p0 = load_p0(p0,Nexp,fname,TwoKeys,ThreeKeys)                    
             GBF1 = copy.deepcopy(GBF2)
             print('Making Prior')
@@ -644,6 +658,7 @@ def main(Autoprior,data):
                 pickle.dump(fit.pmean,pickling_on)
                 pickling_on.close()
             if cond():
+                forresults = fit.p
                 if FitAll == False:
                     if ResultPlots == 'Q':
                         plots(fit.Q,fit.p,Nexp)
@@ -672,7 +687,7 @@ def main(Autoprior,data):
             print(100 * '+')
             print(100 * '+')
             Nexp += 1           
-    print_results(fit.p)
+    print_results(forresults)
     return()
 
 
@@ -720,24 +735,25 @@ def plots(Q,p,Nexp):
             plt.xlabel('{0}'.format(xlab))
             plt.ylabel('dE:{0}'.format(mass))
             for twist in twists:
-                if 'S' in FitCorrs:
-                    result = p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0]
-                    y = result.mean
-                    err = result.sdev    
-                    plt.figure('SVnn_m{0}_tw{1}'.format(mass,twist))
-                    plt.errorbar(Q,y,yerr=err, capsize=2, fmt='o', mfc='none', label=('{0} = {1:.2f}'.format(lab,Nexp)))
-                    plt.legend()
-                    plt.xlabel('{0}'.format(xlab))
-                    plt.ylabel('SVnn_m{0}_tw{1}'.format(mass,twist))
-                if 'V' in FitCorrs:
-                    result = p['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0]
-                    y = result.mean
-                    err = result.sdev    
-                    plt.figure('VVnn_m{0}_tw{1}'.format(mass,twist))
-                    plt.errorbar(Q,y,yerr=err, capsize=2, fmt='o', mfc='none', label=('{0} = {1:.2f}'.format(lab,Nexp)))
-                    plt.legend()
-                    plt.xlabel('{0}'.format(xlab))
-                    plt.ylabel('VVnn_m{0}_tw{1}'.format(mass,twist))
+                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                    if 'S' in FitCorrs:                    
+                        result = p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0]
+                        y = result.mean
+                        err = result.sdev    
+                        plt.figure('SVnn_m{0}_tw{1}'.format(mass,twist))
+                        plt.errorbar(Q,y,yerr=err, capsize=2, fmt='o', mfc='none', label=('{0} = {1:.2f}'.format(lab,Nexp)))
+                        plt.legend()
+                        plt.xlabel('{0}'.format(xlab))
+                        plt.ylabel('SVnn_m{0}_tw{1}'.format(mass,twist))
+                    if 'V' in FitCorrs:
+                        result = p['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0]
+                        y = result.mean
+                        err = result.sdev    
+                        plt.figure('VVnn_m{0}_tw{1}'.format(mass,twist))
+                        plt.errorbar(Q,y,yerr=err, capsize=2, fmt='o', mfc='none', label=('{0} = {1:.2f}'.format(lab,Nexp)))
+                        plt.legend()
+                        plt.xlabel('{0}'.format(xlab))
+                        plt.ylabel('VVnn_m{0}_tw{1}'.format(mass,twist))
     return()
 
 
@@ -828,19 +844,21 @@ def makeKeys():
     if 'S' in FitCorrs:
         for mass in masses:
             for twist in twists:
-                ThreeKeys.append('SVnn_m{0}_tw{1}'.format(mass,twist))
-                ThreeKeys.append('SVno_m{0}_tw{1}'.format(mass,twist))
-                if twist != '0':
-                    ThreeKeys.append('SVon_m{0}_tw{1}'.format(mass,twist))
-                    ThreeKeys.append('SVoo_m{0}_tw{1}'.format(mass,twist))
+                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                    ThreeKeys.append('SVnn_m{0}_tw{1}'.format(mass,twist))
+                    ThreeKeys.append('SVno_m{0}_tw{1}'.format(mass,twist))
+                    if twist != '0':
+                        ThreeKeys.append('SVon_m{0}_tw{1}'.format(mass,twist))
+                        ThreeKeys.append('SVoo_m{0}_tw{1}'.format(mass,twist))
     if 'V' in FitCorrs:
         for mass in masses:
             for twist in twists:
-                ThreeKeys.append('VVnn_m{0}_tw{1}'.format(mass,twist))
-                ThreeKeys.append('VVno_m{0}_tw{1}'.format(mass,twist))
-                if twist != '0':
-                    ThreeKeys.append('VVon_m{0}_tw{1}'.format(mass,twist))
-                    ThreeKeys.append('VVoo_m{0}_tw{1}'.format(mass,twist))
+                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                    ThreeKeys.append('VVnn_m{0}_tw{1}'.format(mass,twist))
+                    ThreeKeys.append('VVno_m{0}_tw{1}'.format(mass,twist))
+                    if twist != '0':
+                        ThreeKeys.append('VVon_m{0}_tw{1}'.format(mass,twist))
+                        ThreeKeys.append('VVoo_m{0}_tw{1}'.format(mass,twist))
     #print(TwoKeys,ThreeKeys)
     return(TwoKeys,ThreeKeys)
 
@@ -991,11 +1009,13 @@ def print_results(p):
     if 'S' in FitCorrs:
         for mass in masses:
             for twist in twists:
-                print('SVnn m  {0:<5} tw {1:<7}: {2:<12} Error: {3:.3f}%'. format(mass, twist,p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0],100*p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0].sdev/p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0].mean))
+                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                    print('SVnn m  {0:<5} tw {1:<7}: {2:<12} Error: {3:.3f}%'. format(mass, twist,p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0],100*p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0].sdev/p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0].mean))
     if 'V' in FitCorrs:
         for mass in masses:
             for twist in twists:
-                print('VVnn m  {0:<5} tw {1:<7}: {2:<12} Error: {3:.3f}%'. format(mass, twist,p['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0],100*p['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0].sdev/p['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0].mean))
+                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                    print('VVnn m  {0:<5} tw {1:<7}: {2:<12} Error: {3:.3f}%'. format(mass, twist,p['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0],100*p['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0].sdev/p['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0].mean))
 
     return()
 
@@ -1011,13 +1031,13 @@ if DoFit == True:
         FitCorrs = ['G','NG','D','S','V']
         for i in range(4):
             FitMasses = [i]
-            for j in range(5):                
+            for j in range(5):                 
                 FitTwists = [j]
-                TwoPts,ThreePts,masses,twists,Ts,tmaxesG,tmaxesNG,tmaxesD = make_params(FitMasses, FitTwists,FitTs)
+                TwoPts,ThreePts,masses,twists,Ts,tmaxesG,tmaxesNG,tmaxesD,qsqPos = make_params(FitMasses, FitTwists,FitTs)
                 main(Autoprior,data)
                             
     else:        
-        TwoPts,ThreePts,masses,twists,Ts,tmaxesG,tmaxesNG,tmaxesD = make_params(FitMasses,FitTwists,FitTs)
+        TwoPts,ThreePts,masses,twists,Ts,tmaxesG,tmaxesNG,tmaxesD,qsqPos = make_params(FitMasses,FitTwists,FitTs)
         if TestData == True:
             test_data()
         main(Autoprior,data)
