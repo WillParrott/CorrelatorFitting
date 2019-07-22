@@ -119,14 +119,14 @@ DoFit = True
 FitAll = False
 TestData = False
 Fit = F                                               # Choose to fit F, SF or UF
-FitMasses = [0,1,2,3]                                 # Choose which masses to fit
-FitTwists = [0,1,2,3,4]                               # Choose which twists to fit
+FitMasses = [0,3]#,1,2,3]                                 # Choose which masses to fit
+FitTwists = [0,4]#1,2,3,4]                               # Choose which twists to fit
 FitTs = [0,1,2]
 FitCorrs = ['G','NG','D','S','V']  # Choose which corrs to fit ['G','NG','D','S','V']
 FitAllTwists = False
-Chained = False
+Chained = True
 CorrBayes = False
-SaveFit = True
+SaveFit = False
 svdnoise = False
 priornoise = False
 ResultPlots = False         # Tell what to plot against, "Q", "N","Log(GBF)", False
@@ -345,7 +345,7 @@ def eff_calc():
 
 
 
-def make_prior(N,M_eff,A_eff,V_eff,Autoprior):    
+def make_prior(All,N,M_eff,A_eff,V_eff,Autoprior):    
     Lambda = 0.5    ###Set Lambda_QCD in GeV
     an = Fit['an']
     SVn = Fit['SVn']
@@ -409,32 +409,33 @@ def make_prior(N,M_eff,A_eff,V_eff,Autoprior):
                 prior['log(dE:o{0})'.format(TwoPts['NGm{0}'.format(mass)])] = gv.log(gv.gvar(N * ['{0}({1})'.format(Lambda*a,0.5*Lambda*a)]))
                 #prior['log(o{0}:a)'.format(TwoPts['NGm{0}'.format(mass)])][0] = gv.log(gv.gvar(A_eff['NGm{0}'.format(mass)].mean,loosener*A_eff['NGm{0}'.format(mass)].mean))
                 prior['log(dE:o{0})'.format(TwoPts['NGm{0}'.format(mass)])][0] = gv.log(gv.gvar(M_eff['NGm{0}'.format(mass)].mean+Lambda*a,oMloosener*(M_eff['NGm{0}'.format(mass)].mean+Lambda*a)))
-    if 'S' in FitCorrs:
-        for mass in masses: 
-            for twist in twists:
-                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
-                    prior['SVnn_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
-                    prior['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean,loosener*V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean)
-                    prior['SVno_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
-                    prior['SVno_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
-                    if twist != '0':                    
-                        prior['SVon_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
-                        prior['SVon_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
-                        prior['SVoo_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
-                        prior['SVoo_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
-    if 'V' in FitCorrs:
-        for mass in masses:
-            for twist in twists:
-                if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
-                    prior['VVnn_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
-                    prior['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(V_eff['Vm{0}_tw{1}'.format(mass,twist)].mean,loosener*V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean)
-                    prior['VVno_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
-                    prior['VVno_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
-                    if twist != '0':                    
-                        prior['VVon_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
-                        prior['VVon_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
-                        prior['VVoo_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
-                        prior['VVoo_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
+    if All == True:
+        if 'S' in FitCorrs:
+            for mass in masses: 
+                for twist in twists:
+                    if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                        prior['SVnn_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
+                        prior['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean,loosener*V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean)
+                        prior['SVno_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
+                        prior['SVno_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
+                        if twist != '0':                    
+                            prior['SVon_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
+                            prior['SVon_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
+                            prior['SVoo_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [SVn]])
+                            prior['SVoo_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(SV0)
+        if 'V' in FitCorrs:
+            for mass in masses:
+                for twist in twists:
+                    if qsqPos['m{0}_tw{1}'.format(mass,twist)] == 1:
+                        prior['VVnn_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
+                        prior['VVnn_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(V_eff['Vm{0}_tw{1}'.format(mass,twist)].mean,loosener*V_eff['Sm{0}_tw{1}'.format(mass,twist)].mean)
+                        prior['VVno_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
+                        prior['VVno_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
+                        if twist != '0':                    
+                            prior['VVon_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
+                            prior['VVon_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
+                            prior['VVoo_m{0}_tw{1}'.format(mass,twist)] = gv.gvar(N * [N * [VVn]])
+                            prior['VVoo_m{0}_tw{1}'.format(mass,twist)][0][0] = gv.gvar(VV0)
     return(prior)
 
 
@@ -497,10 +498,13 @@ def make_models():
                             Vthreepts.append(cf.Corr3(datatag=ThreePts['Vm{0}_tw{1}_T{2}'.format(mass,twist,T)], T=T, tmin=Vtmin, a=('{0}:a'.format(DCorrelator)), dEa=('dE:{0}'.format(DCorrelator)), b=('{0}:a'.format(NGCorrelator), 'o{0}:a'.format(NGCorrelator)), dEb=('dE:{0}'.format(NGCorrelator), 'dE:o{0}'.format(NGCorrelator)), sb=(1,-1), Vnn='VVnn_m'+str(mass)+'_tw'+str(twist), Vno='VVno_m'+str(mass)+'_tw'+str(twist)))
                         
     if Chained == True:            
-        twopts = tuple(twopts)
-        Sthreepts =tuple(Sthreepts)
-        Vthreepts =tuple(Vthreepts)
-        return(twopts,Sthreepts,Vthreepts)
+        twopts = twopts
+        threepts = []
+        for element in range(len(Sthreepts)):
+            threepts.append(Sthreepts[element])
+        for element in range(len(Vthreepts)):
+            threepts.append(Vthreepts[element])
+        return(twopts,threepts)
     else:
         twopts.extend(Sthreepts)
         twopts.extend(Vthreepts)
@@ -508,46 +512,85 @@ def make_models():
 
     
     
-def modelsandsvd(N):
+def modelsandsvd():
     if Chained == True:     
-        twopts,Sthreepts,Vthreepts = make_models()
-        #models = [twopts, dict(nterm=(N,N)), Sthreepts, Vthreepts]
-        models = []
-        if 'S' in FitCorrs or 'V' in FitCorrs: 
-            models.append(twopts)
-            models.append(dict(nterm=(N,N)))
-        else:
-            models.extend(twopts)
-        if 'S' in FitCorrs:
-            models.append(Sthreepts)
-        if 'V' in FitCorrs:
-            models.append(Vthreepts)
+        twopts,threepts = make_models()
+        models = [twopts, threepts]
+        File2 = 'Ps/Chain2pts{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}.pickle'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['tminG'],Fit['tminNG'],Fit['tminD'],tmaxesG,tmaxesNG,tmaxesD,FitAllTwists)
+        File3 = 'Ps/Chain3pts{0}{1}{2}{3}{4}{5}{6}{7}.pickle'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],FitAllTwists)
     else:
         models = make_models()   
     print('Models made: ', models)
     File = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}.pickle'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],tmaxesG,tmaxesNG,tmaxesD,Chained,FitAllTwists)
-    if AutoSvd == True:        
-        if os.path.isfile(File) == True:
-            pickle_off = open(File,"rb")
-            trueSvd = pickle.load(pickle_off)
-            svdcut = SvdFactor*trueSvd
-            print('Used existing svdcut {0} times factor {1}:'.format(trueSvd,SvdFactor), svdcut)
-        else:
-            print('Calculating svd')
-            s = gv.dataset.svd_diagnosis(cf.read_dataset(filename), models=models, nbstrap=20)
-            s.plot_ratio(show=True)
-            var = input("Hit enter to accept svd = {0}, or else type svd here:".format(s.svdcut))
-            if var == '':
-                trueSvd = s.svdcut
-                svdcut = trueSvd*SvdFactor
-                print('Used calculated svdcut {0}, times factor {1}:'.format(trueSvd,SvdFactor),svdcut)
+    if AutoSvd == True:
+        if Chained == True:
+            #####################################CHAINED########################################
+            if os.path.isfile(File2) == True:
+                pickle_off = open(File2,"rb")
+                trueSvd = pickle.load(pickle_off)
+                svdcut2 = SvdFactor*trueSvd
+                print('Used existing svdcut for twopoints {0} times factor {1}:'.format(trueSvd,SvdFactor), svdcut2)
             else:
-                trueSvd = float(var)
+                print('Calculating svd')
+                s = gv.dataset.svd_diagnosis(cf.read_dataset(filename), models=models[0], nbstrap=20)
+                s.plot_ratio(show=True)
+                var = input("Hit enter to accept svd for twopoints = {0}, or else type svd here:".format(s.svdcut))
+                if var == '':
+                    trueSvd = s.svdcut
+                    svdcut2 = trueSvd*SvdFactor
+                    print('Used calculated svdcut for twopoints {0}, times factor {1}:'.format(trueSvd,SvdFactor),svdcut2)
+                else:
+                    trueSvd = float(var)
+                    svdcut2 = SvdFactor*trueSvd
+                    print('Used alternative svdcut for twopoints {0}, times factor {1}:'.format(float(var),SvdFactor), svdcut2)                
+                pickling_on = open(File2, "wb")
+                pickle.dump(trueSvd,pickling_on)
+                pickling_on.close()
+            if os.path.isfile(File3) == True:
+                pickle_off = open(File3,"rb")
+                trueSvd = pickle.load(pickle_off)
+                svdcut3 = SvdFactor*trueSvd
+                print('Used existing svdcut for threepoints {0} times factor {1}:'.format(trueSvd,SvdFactor), svdcut3)
+            else:
+                print('Calculating svd')
+                s = gv.dataset.svd_diagnosis(cf.read_dataset(filename), models=models[1], nbstrap=20)
+                s.plot_ratio(show=True)
+                var = input("Hit enter to accept svd for threepoints = {0}, or else type svd here:".format(s.svdcut))
+                if var == '':
+                    trueSvd = s.svdcut
+                    svdcut3 = trueSvd*SvdFactor
+                    print('Used calculated svdcut for threepoints {0}, times factor {1}:'.format(trueSvd,SvdFactor),svdcut3)
+                else:
+                    trueSvd = float(var)
+                    svdcut3 = SvdFactor*trueSvd
+                    print('Used alternative svdcut for threepoints {0}, times factor {1}:'.format(float(var),SvdFactor), svdcut3)                
+                pickling_on = open(File3, "wb")
+                pickle.dump(trueSvd,pickling_on)
+                pickling_on.close()
+            svdcut=[svdcut2,svdcut3]
+        #####################################UNCHAINED########################################        
+        else:
+            if os.path.isfile(File) == True:
+                pickle_off = open(File,"rb")
+                trueSvd = pickle.load(pickle_off)
                 svdcut = SvdFactor*trueSvd
-                print('Used alternative svdcut {0}, times factor {1}:'.format(float(var),SvdFactor), svdcut)                
-            pickling_on = open(File, "wb")
-            pickle.dump(trueSvd,pickling_on)
-            pickling_on.close()
+                print('Used existing svdcut {0} times factor {1}:'.format(trueSvd,SvdFactor), svdcut)
+            else:
+                print('Calculating svd')
+                s = gv.dataset.svd_diagnosis(cf.read_dataset(filename), models=models, nbstrap=20)
+                s.plot_ratio(show=True)
+                var = input("Hit enter to accept svd = {0}, or else type svd here:".format(s.svdcut))
+                if var == '':
+                    trueSvd = s.svdcut
+                    svdcut = trueSvd*SvdFactor
+                    print('Used calculated svdcut {0}, times factor {1}:'.format(trueSvd,SvdFactor),svdcut)
+                else:
+                    trueSvd = float(var)
+                    svdcut = SvdFactor*trueSvd
+                    print('Used alternative svdcut {0}, times factor {1}:'.format(float(var),SvdFactor), svdcut)                
+                pickling_on = open(File, "wb")
+                pickle.dump(trueSvd,pickling_on)
+                pickling_on.close()
     else:
         if os.path.isfile(File) == True:
             pickle_off = open(File,"rb")
@@ -576,60 +619,126 @@ def main(Autoprior,data):
     p0 = collections.OrderedDict()
 ######################### CHAINED ################################### Needs updating before use
     if Chained == True:
-        N=1
+        Nexp = 3
         GBF1 = -1e21
         GBF2 = -1e20
-        while N <= Nmax-2:
-            if GBF2-GBF1 > 0.5:
-                models,svdcut = modelsandsvd(N)
-                Fitter = cf.CorrFitter(models=models, svdcut=svdcut, fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, fast=False)
-                fname = 'Ps/{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],Fit['tminG'],Fit['tminNG'],Fit['tminD'],Chained,Nmax)
-                if os.path.isfile('{0}{1}.pickle'.format(fname,N)) == True:
-                    pickle_off = open('{0}{1}.pickle'.format(fname,N),"rb")
-                    p0 = pickle.load(pickle_off)
-                    print('Used existing p0 for N')
-                elif os.path.isfile('{0}{1}.pickle'.format(fname,N+1)) == True:
-                    pickle_off = open('{0}{1}.pickle'.format(fname,N+1),"rb")
-                    p0 = pickle.load(pickle_off)
-                    print('Used existing p0 for N+1')                
-                GBF1 = GBF2
-                print('Making Prior')              
-                prior = make_prior(Nmax,M_eff,A_eff,V_eff,Autoprior)        
-                print(30 * '=', 'Chained-Marginalised', 'nterm =','({0},{0})'.format(N), 'Nmax =',Nmax)
-                fit = Fitter.chained_lsqfit(data=data, prior=prior,  p0=p0, add_svdnoise=svdnoise, add_priornoise=priornoise)
-                GBF2 = fit.logGBF
-                if GBF2-GBF1 > 0:
+        bothmodels,bothsvds = modelsandsvd()
+        models = bothmodels[0]
+        svdcut = bothsvds[0]
+        Fitter = cf.CorrFitter(models=models, svdcut=svdcut, fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, fast=False, tol=(1e-6,0.0,0.0))
+        cond = (lambda: Nexp <= 8) if FitAll else (lambda: GBF2 - GBF1 > 0.01)
+        while cond():           
+            fname2 = 'Ps/Chain2pts{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['tminG'],Fit['tminNG'],Fit['tminD'],tmaxesG,tmaxesNG,tmaxesD,FitAllTwists)            
+            p0 = load_p0(p0,Nexp,fname2,TwoKeys,[])                    
+            GBF1 = copy.deepcopy(GBF2)
+            print('Making Prior')
+            if CorrBayes == True:
+                Autoprior,data = make_data(filename,Nexp)       
+            prior = make_prior(False,Nexp,M_eff,A_eff,V_eff,Autoprior)
+            print(30 * '=','Chained','Nexp =',Nexp,'Date',datetime.datetime.now())            
+            fit = Fitter.lsqfit(data=data, prior=prior,  p0=p0, add_svdnoise=svdnoise, add_priornoise=priornoise)            
+            GBF2 = fit.logGBF
+            cond = (lambda: Nexp <= 8) if FitAll else (lambda: GBF2 - GBF1 > 0.01)
+            if fit.Q>=0.05:
+                pickling_on = open('{0}{1}.pickle'.format(fname2,Nexp), "wb")
+                pickle.dump(fit.pmean,pickling_on)
+                pickling_on.close()
+            if cond():
+                for2results = fit.p
+                if FitAll == False:
                     if ResultPlots == 'Q':
-                        plots(fit.Q,fit.p,N)
+                        plots(fit.Q,fit.p,Nexp)
                     if ResultPlots == 'GBF':
-                        plots(GBF2,fit.p,N)
+                        plots(GBF2,fit.p,Nexp)
                     if ResultPlots == 'N':
-                        plots(N,fit.p,fit.Q)
-                    print(fit.formatall(pstyle='v'))
-                    print('N = ({0},{0})'.format(N))
-                    print('Q = {0:.2f}'.format(fit.Q))
-                    print('log(GBF) = {0:.1f}, up {1:.1f}'.format(GBF2,GBF2-GBF1))   
-                    print('chi2/dof = {0:.2f}'.format(fit.chi2/fit.dof))
-                    print('SVD noise = {0} Prior noise = {1}'.format(svdnoise,priornoise))        
-                    if fit.Q >= 0.05:
-                        if SaveFit == True:
-                            gv.dump(fit.p,'Fits/{6}5_Q{5:.2f}_Nmax{0}_Stmin{1}_Vtmin{2}_svd{3:.5f}_nterm{4}_chi{7:.3f}'.format(Nmax,Fit['Stmin'],Fit['Vtmin'],svdcut,N,fit.Q,Fit['conf'],fit.chi2/fit.dof))
-                            f = open('Fits/{6}5_Q{5:.2f}_Nmax{0}_Stmin{1}_Vtmin{2}_svd{3:.5f}_nterm{4}_chi{7:.3f}.txt'.format(Nmax,Fit['Stmin'],Fit['Vtmin'],svdcut,N,fit.Q,Fit['conf'],fit.chi2/fit.dof), 'w')
-                            f.write(fit.format(pstyle='v'))
-                            f.close()
+                        plots(Nexp,fit.p,fit.Q)
+                print(fit)
+                #print(fit.format(pstyle=None if Nexp<3 else'v'))
+                print('Nexp = ',Nexp)
+                print('Q = {0:.2f}'.format(fit.Q))
+                print('log(GBF) = {0:.2f}, up {1:.2f}'.format(GBF2,GBF2-GBF1))       
+                print('chi2/dof = {0:.2f}'.format(fit.chi2/fit.dof))
+                print('dof =', fit.dof)
+                print('SVD noise = {0} Prior noise = {1}'.format(svdnoise,priornoise))
+                if fit.Q >= 0.05:
+                    p0=fit.pmean
+                    save_p0(p0,Nexp,fname2,TwoKeys,[])
+                    if SaveFit == True:
+                        gv.dump(fit.p,'Fits/{5}5_2pts_Q{4:.2f}_Nexp{0}_Stmin{1}_Vtmin{2}_svd{3:.5f}_chi{6:.3f}'.format(Nexp,Fit['Stmin'],Fit['Vtmin'],svdcut,fit.Q,Fit['conf'],fit.chi2/fit.dof))
+                        f = open('Fits/{5}5_2pts_Q{4:.2f}_Nexp{0}_Stmin{1}_Vtmin{2}_svd{3:.5f}_chi{6:.3f}.txt'.format(Nexp,Fit['Stmin'],Fit['Vtmin'],svdcut,fit.Q,Fit['conf'],fit.chi2/fit.dof), 'w')
+                        f.write(fit.format(pstyle=None if Nexp<3 else'v'))
+                        f.close()
+            else:
+                print('log(GBF) had gone down by {2:.2f} from {0:.2f} to {1:.2f}'.format(GBF1,GBF2,GBF1-GBF2))                
+            print(100 * '+')
+            print(100 * '+')
+            Nexp += 1
 
-                else:
-                    print('log(GBF) had gone down by {2:.2f} from {0:.2f} to {1:.2f}'.format(GBF1,GBF2,GBF1-GBF2))            
-                if fit.Q >= 0.01:
-                    pickling_on = open('{0}{1}.pickle'.format(fname,N), "wb")
-                    pickle.dump(fit.pmean,pickling_on)
-                    pickling_on.close()
-                    p0=fit.pmean   
-                if GBF2-GBF1 < 0:
-                    return()
+        print(100*'=','MOVING TO 3 POINTS')    
+        Nexp = 2
+        GBF1 = -1e21
+        GBF2 = -1e20
+        models = bothmodels[1]
+        svdcut = bothsvds[1]
+        Fitter = cf.CorrFitter(models=models, svdcut=svdcut, fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, fast=False, tol=(1e-6,0.0,0.0))
+        cond = (lambda: Nexp <= 8) if FitAll else (lambda: GBF2 - GBF1 > 0.01)
+        while cond():           
+            fname3 = 'Ps/Chain3pts{0}{1}{2}{3}{4}{5}{6}{7}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],FitAllTwists)            
+            p0 = load_p0(p0,Nexp,fname3,TwoKeys,ThreeKeys)                    
+            GBF1 = copy.deepcopy(GBF2)
+            print('Making Prior')
+            if CorrBayes == True:
+                Autoprior,data = make_data(filename,Nexp)       
+            prior = make_prior(True,Nexp,M_eff,A_eff,V_eff,Autoprior)
+            for key in for2results:
+                for n in range(Nexp):
+                    if n < len(for2results[key]):
+                        prior[key][n] = for2results[key][n]
+            print(30 * '=','Chained','Nexp =',Nexp,'Date',datetime.datetime.now())            
+            fit = Fitter.lsqfit(data=data, prior=prior,  p0=p0, add_svdnoise=svdnoise, add_priornoise=priornoise)            
+            GBF2 = fit.logGBF
+            cond = (lambda: Nexp <= 8) if FitAll else (lambda: GBF2 - GBF1 > 0.01)
+            if fit.Q>=0.05:
+                pickling_on = open('{0}{1}.pickle'.format(fname3,Nexp), "wb")
+                pickle.dump(fit.pmean,pickling_on)
+                pickling_on.close()
+            if cond():
+                for3results = fit.p
+                if FitAll == False:
+                    if ResultPlots == 'Q':
+                        plots(fit.Q,fit.p,Nexp)
+                    if ResultPlots == 'GBF':
+                        plots(GBF2,fit.p,Nexp)
+                    if ResultPlots == 'N':
+                        plots(Nexp,fit.p,fit.Q)
+                print(fit)
+                #print(fit.format(pstyle=None if Nexp<3 else'v'))
+                print('Nexp = ',Nexp)
+                print('Q = {0:.2f}'.format(fit.Q))
+                print('log(GBF) = {0:.2f}, up {1:.2f}'.format(GBF2,GBF2-GBF1))       
+                print('chi2/dof = {0:.2f}'.format(fit.chi2/fit.dof))
+                print('dof =', fit.dof)
+                print('SVD noise = {0} Prior noise = {1}'.format(svdnoise,priornoise))
+                if fit.Q >= 0.05:
+                    p0=fit.pmean
+                    save_p0(p0,Nexp,fname3,TwoKeys,ThreeKeys)
+                    if SaveFit == True:
+                        gv.dump(fit.p,'Fits/{5}5_3pts_Q{4:.2f}_Nexp{0}_Stmin{1}_Vtmin{2}_svd{3:.5f}_chi{6:.3f}'.format(Nexp,Fit['Stmin'],Fit['Vtmin'],svdcut,fit.Q,Fit['conf'],fit.chi2/fit.dof))
+                        f = open('Fits/{5}5_3pts_Q{4:.2f}_Nexp{0}_Stmin{1}_Vtmin{2}_svd{3:.5f}_chi{6:.3f}.txt'.format(Nexp,Fit['Stmin'],Fit['Vtmin'],svdcut,fit.Q,Fit['conf'],fit.chi2/fit.dof), 'w')
+                        f.write(fit.format(pstyle=None if Nexp<3 else'v'))
+                        f.close()
+                        
+            else:
+                print('log(GBF) had gone down by {2:.2f} from {0:.2f} to {1:.2f}'.format(GBF1,GBF2,GBF1-GBF2))                
             print(100 * '+')
             print(100 * '+')
-            N += 1 
+            Nexp += 1    
+        #print_results(for2results)
+        print_results(for3results)
+
+                
+                
+            
 ########################## Unchained ######################################                
     else:
         #print('Initial p0', p0)        
@@ -638,7 +747,7 @@ def main(Autoprior,data):
             Nexp = 2
         GBF1 = -1e21
         GBF2 = -1e20
-        models,svdcut = modelsandsvd('somenumber')
+        models,svdcut = modelsandsvd()
         Fitter = cf.CorrFitter(models=models, svdcut=svdcut, fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, fast=False, tol=(1e-6,0.0,0.0))
         cond = (lambda: Nexp <= 8) if FitAll else (lambda: GBF2 - GBF1 > 0.01)
         while cond():           
@@ -648,7 +757,7 @@ def main(Autoprior,data):
             print('Making Prior')
             if CorrBayes == True:
                 Autoprior,data = make_data(filename,Nexp)       
-            prior = make_prior(Nexp,M_eff,A_eff,V_eff,Autoprior)
+            prior = make_prior(True,Nexp,M_eff,A_eff,V_eff,Autoprior)
             print(30 * '=','Unchained-Unmarginalised','Nexp =',Nexp,'Date',datetime.datetime.now())            
             fit = Fitter.lsqfit(data=data, prior=prior,  p0=p0, add_svdnoise=svdnoise, add_priornoise=priornoise)            
             GBF2 = fit.logGBF
@@ -687,7 +796,7 @@ def main(Autoprior,data):
             print(100 * '+')
             print(100 * '+')
             Nexp += 1           
-    print_results(forresults)
+        print_results(forresults)
     return()
 
 
@@ -949,8 +1058,8 @@ def load_p0(p0,Nexp,fname,TwoKeys,ThreeKeys):
         p1 = pickle.load(pickle_off)
         for key in TwoKeys:
             if key in p1.keys():
-                #p1[key].pop(Nexp)        
-                p0[key]=p1[key]
+                p0.pop(key,None)
+                p0[key] = p1[key][:-1]
         print('Using existing p0 for Nexp+1')
     
     elif os.path.exists('Ps/{0}.pickle'.format(Fit['conf'])):
