@@ -118,15 +118,16 @@ UF['threePtTag'] = ['{0}.T{1}_m{2}_m{3}_m{2}','{0}.T{1}_m{2}_m{3}_m{2}_tw{4}','{
 DoFit = True
 FitAll = False
 TestData = False
-Fit = F                                               # Choose to fit F, SF or UF
-FitMasses = [0,3]#,1,2,3]                                 # Choose which masses to fit
-FitTwists = [0,4]#1,2,3,4]                               # Choose which twists to fit
+Fit = SF                                               # Choose to fit F, SF or UF
+FitMasses = [0,1,2,3]                                 # Choose which masses to fit
+FitTwists = [0,1,2,3,4]                               # Choose which twists to fit
 FitTs = [0,1,2]
 FitCorrs = ['G','NG','D','S','V']  # Choose which corrs to fit ['G','NG','D','S','V']
 FitAllTwists = False
 Chained = True
+Marginalised = True
 CorrBayes = False
-SaveFit = False
+SaveFit = True
 svdnoise = False
 priornoise = False
 ResultPlots = False         # Tell what to plot against, "Q", "N","Log(GBF)", False
@@ -673,36 +674,64 @@ def main(Autoprior,data):
             print(100 * '+')
             print(100 * '+')
             Nexp += 1
-
-        print(100*'=','MOVING TO 3 POINTS')    
-        Nexp = 2
+        NMarg = Nexp-2
+        print(100*'=')
+        print(100*'=','MOVING TO 3 POINTS')
+        print(100*'=')
+        ###################################THREEPOINTS###############################################
+        if Marginalised == False:
+            Nexp = 2
+        else:
+            Nexp = 1
         GBF1 = -1e21
         GBF2 = -1e20
         models = bothmodels[1]
         svdcut = bothsvds[1]
-        Fitter = cf.CorrFitter(models=models, svdcut=svdcut, fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, fast=False, tol=(1e-6,0.0,0.0))
+        Fitter = cf.CorrFitter(models=models, svdcut=svdcut, fitter='gsl_multifit', alg='subspace2D', solver='cholesky', maxit=5000, fast=False, tol=(1e-6,0.0,0.0))            
         cond = (lambda: Nexp <= 8) if FitAll else (lambda: GBF2 - GBF1 > 0.01)
-        while cond():           
-            fname3 = 'Ps/Chain3pts{0}{1}{2}{3}{4}{5}{6}{7}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],FitAllTwists)            
-            p0 = load_p0(p0,Nexp,fname3,TwoKeys,ThreeKeys)                    
+        cond2 = (lambda: Nexp <= 8) if Marginalised else (lambda: GBF2 - GBF1 > 0.01)
+        while cond() and cond2():           
+            fname3 = 'Ps/Chain3pts{0}{1}{2}{3}{4}{5}{6}{7}{8}'.format(Fit['conf'],FitMasses,FitTwists,FitTs,FitCorrs,Fit['Stmin'],Fit['Vtmin'],FitAllTwists,Marginalised)
+            if Marginalised == False:
+                p0 = load_p0(p0,Nexp,fname3,TwoKeys,ThreeKeys)
+            else:
+                p0 = load_p0(p0,NMarg,fname3,TwoKeys,ThreeKeys)   
             GBF1 = copy.deepcopy(GBF2)
             print('Making Prior')
             if CorrBayes == True:
-                Autoprior,data = make_data(filename,Nexp)       
-            prior = make_prior(True,Nexp,M_eff,A_eff,V_eff,Autoprior)
-            for key in for2results:
-                for n in range(Nexp):
-                    if n < len(for2results[key]):
-                        prior[key][n] = for2results[key][n]
-            print(30 * '=','Chained','Nexp =',Nexp,'Date',datetime.datetime.now())            
-            fit = Fitter.lsqfit(data=data, prior=prior,  p0=p0, add_svdnoise=svdnoise, add_priornoise=priornoise)            
+                if Marginalised == False:
+                     Autoprior,data = make_data(filename,Nexp)
+                else:
+                    Autoprior,data = make_data(filename,NMarg)
+            if Marginalised == False:
+                prior = make_prior(True,Nexp,M_eff,A_eff,V_eff,Autoprior)
+            else:
+                prior = make_prior(True,NMarg,M_eff,A_eff,V_eff,Autoprior)
+            if Marginalised == False: 
+                for key in for2results:
+                    for n in range(Nexp):
+                        if n < len(for2results[key]):
+                            prior[key][n] = for2results[key][n]
+            else:                                                    
+                for key in for2results:
+                    for n in range(NMarg):
+                        if n < len(for2results[key]):
+                            prior[key][n] = for2results[key][n]
+            if Marginalised == False:
+                print(30 * '=','Chained','Nexp =',Nexp,'Date',datetime.datetime.now())
+            else:
+                print(30 * '=','Chained and Marginalised','NMarg =',NMarg, 'nterm =','({0},{0})'.format(Nexp),'Date',datetime.datetime.now())
+            if Marginalised == False:
+                fit = Fitter.lsqfit(data=data, prior=prior,  p0=p0, add_svdnoise=svdnoise, add_priornoise=priornoise)
+            else:
+                fit = Fitter.lsqfit(data=data, prior=prior,  p0=p0, nterm=(Nexp,Nexp), add_svdnoise=svdnoise, add_priornoise=priornoise)
             GBF2 = fit.logGBF
             cond = (lambda: Nexp <= 8) if FitAll else (lambda: GBF2 - GBF1 > 0.01)
             if fit.Q>=0.05:
                 pickling_on = open('{0}{1}.pickle'.format(fname3,Nexp), "wb")
                 pickle.dump(fit.pmean,pickling_on)
                 pickling_on.close()
-            if cond():
+            if cond() and cond2():
                 for3results = fit.p
                 if FitAll == False:
                     if ResultPlots == 'Q':
@@ -713,7 +742,10 @@ def main(Autoprior,data):
                         plots(Nexp,fit.p,fit.Q)
                 print(fit)
                 #print(fit.format(pstyle=None if Nexp<3 else'v'))
-                print('Nexp = ',Nexp)
+                if Marginalised == False:
+                    print('Nexp = ',Nexp)
+                else:
+                    print('NMarg = ',NMarg, 'nterm =', '({0},{0})'.format(Nexp))
                 print('Q = {0:.2f}'.format(fit.Q))
                 print('log(GBF) = {0:.2f}, up {1:.2f}'.format(GBF2,GBF2-GBF1))       
                 print('chi2/dof = {0:.2f}'.format(fit.chi2/fit.dof))
@@ -721,7 +753,10 @@ def main(Autoprior,data):
                 print('SVD noise = {0} Prior noise = {1}'.format(svdnoise,priornoise))
                 if fit.Q >= 0.05:
                     p0=fit.pmean
-                    save_p0(p0,Nexp,fname3,TwoKeys,ThreeKeys)
+                    if Marginalised == False:
+                        save_p0(p0,Nexp,fname3,TwoKeys,ThreeKeys)
+                    #else:
+                    #    save_p0(p0,NMarg,fname3,TwoKeys,ThreeKeys)      #Don't save gloabal elements if margianlised
                     if SaveFit == True:
                         gv.dump(fit.p,'Fits/{5}5_3pts_Q{4:.2f}_Nexp{0}_Stmin{1}_Vtmin{2}_svd{3:.5f}_chi{6:.3f}'.format(Nexp,Fit['Stmin'],Fit['Vtmin'],svdcut,fit.Q,Fit['conf'],fit.chi2/fit.dof))
                         f = open('Fits/{5}5_3pts_Q{4:.2f}_Nexp{0}_Stmin{1}_Vtmin{2}_svd{3:.5f}_chi{6:.3f}.txt'.format(Nexp,Fit['Stmin'],Fit['Vtmin'],svdcut,fit.Q,Fit['conf'],fit.chi2/fit.dof), 'w')
