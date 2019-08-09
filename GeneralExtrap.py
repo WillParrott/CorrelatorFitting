@@ -14,7 +14,7 @@ from collections import defaultdict
 ################################## F PARAMETERS ##########################
 F = collections.OrderedDict()
 F['conf']='F'
-F['filename'] = 'Fits/F5_Q1.00_Nexp3_Stmin2_Vtmin1_svd0.00700_chi0.457'
+F['filename'] = 'Fits/F5_3pts_Q1.00_Nexp1_Stmin2_Vtmin1_svd0.00157_chi0.360'
 F['Masses'] = ['0.449','0.566','0.683','0.8']
 F['Twists'] = ['0','0.4281','1.282','2.141','2.570','2.993']
 F['m_s'] = '0.0376'
@@ -32,7 +32,7 @@ F['threePtTag'] = ['{0}.T{1}_m{2}_m{3}_m{2}','{0}.T{1}_m{2}_m{3}_m{2}_tw{4}','{0
 ######################## SF PARAMETERS ####################################
 SF = collections.OrderedDict()
 SF['conf']='SF'
-SF['filename'] = 'Fits/SF5_Q1.00_Nexp3_Stmin2_Vtmin2_svd0.00400_chi0.233'
+SF['filename'] = 'Fits/SF5_3pts_Q1.00_Nexp1_Stmin2_Vtmin2_svd0.00457_chi0.106'
 SF['Masses'] = ['0.274','0.450','0.6','0.8']
 SF['Twists'] = ['0','1.261','2.108','2.946','3.624']
 SF['m_s'] = '0.0234'
@@ -49,14 +49,15 @@ SF['threePtTag'] = ['{0}.T{1}_m{2}_m{3}_m{2}','{0}.T{1}_m{2}_m{3}_m{2}_tw{4}','{
 
 ##################### USER INPUTS ##########################################
 ############################################################################
-Fits = [F,SF]                                         # Choose to fit F, SF or UF
+Fits = [SF]#,SF]                                         # Choose to fit F, SF or UF
 FMasses = [0,1,2,3]                                     # Choose which masses to fit
-FTwists = [5]#0,1,2,3,4]#,5]
+FTwists = [0,1,2,3,4]#,5]
 SFMasses = [0,1,2,3]
 SFTwists = [0,1,2,3,4]
 AddRho = False
 svdnoise = False
 priornoise = False
+FitNegQsq = True
 Pri = '0.00(2.00)'
 DoFit = True
 N = 3
@@ -106,7 +107,7 @@ def get_results(Fit):
         Fit['M_Go_m{0}'.format(mass)] = p['dE:o{0}'.format(Fit['Gm{0}'.format(mass)])][0]
         Fit['M_NG_m{0}'.format(mass)] = p['dE:{0}'.format(Fit['NGm{0}'.format(mass)])][0]
         Fit['M_NGo_m{0}'.format(mass)] = p['dE:o{0}'.format(Fit['NGm{0}'.format(mass)])][0]
-            
+        #print(gv.evalcorr([Fit['M_NG_m{0}'.format(mass)],Fit['M_G_m{0}'.format(mass)]]))    
         for twist in Fit['twists']:
             if 'SVnn_m{0}_tw{1}'.format(mass,twist) in p:
                 Fit['Sm{0}_tw{1}'.format(mass,twist)] = 2*2*gv.sqrt(Fit['E_D_tw{0}'.format(twist)]*Fit['M_G_m{0}'.format(mass)])*p['SVnn_m{0}_tw{1}'.format(mass,twist)][0][0]
@@ -137,8 +138,20 @@ def make_fs(Fit):
                 delta = (float(mass) - float(Fit['m_s']))*(Fit['M_G_m{0}'.format(mass)]-Fit['E_D_tw{0}'.format(twist)])
                 qsq = Fit['M_G_m{0}'.format(mass)]**2 + Fit['M_D_tw{0}'.format(twist)]**2 - 2*Fit['M_G_m{0}'.format(mass)]*Fit['E_D_tw{0}'.format(twist)]
                 t = (Fit['M_G_m{0}'.format(mass)] + Fit['M_D_tw{0}'.format(twist)])**2
-                z = (gv.sqrt(t-qsq)-gv.sqrt(t))/(gv.sqrt(t-qsq)+gv.sqrt(t))           
-                if qsq.mean >= 0:
+                z = (gv.sqrt(t-qsq)-gv.sqrt(t))/(gv.sqrt(t-qsq)+gv.sqrt(t)) 
+                if FitNegQsq == False:
+                    if qsq.mean >= 0:
+                        F0 = (float(mass) - float(Fit['m_s']))*(1/(Fit['M_G_m{0}'.format(mass)]**2 - Fit['M_D_tw{0}'.format(twist)]**2))*Fit['Sm{0}_tw{1}'.format(mass,twist)]               
+                        F_0[mass][twist] = F0                    
+                        qSq[mass][twist] = qsq                    
+                        Z[mass][twist] = z
+                        Sca[mass][twist] = Fit['Sm{0}_tw{1}'.format(mass,twist)]
+                        Vec[mass][twist] = Fit['Vm{0}_tw{1}'.format(mass,twist)]           
+                        A = Fit['M_G_m{0}'.format(mass)] + Fit['E_D_tw{0}'.format(twist)]
+                        B = (Fit['M_G_m{0}'.format(mass)]**2 - Fit['M_D_tw{0}'.format(twist)]**2)*(Fit['M_G_m{0}'.format(mass)] - Fit['E_D_tw{0}'.format(twist)])/qsq           
+                        if twist != '0':
+                            F_plus[mass][twist] = (1/(A-B))*(Z_v*Fit['Vm{0}_tw{1}'.format(mass,twist)] - B*F0)       
+                elif FitNegQsq == True:
                     F0 = (float(mass) - float(Fit['m_s']))*(1/(Fit['M_G_m{0}'.format(mass)]**2 - Fit['M_D_tw{0}'.format(twist)]**2))*Fit['Sm{0}_tw{1}'.format(mass,twist)]               
                     F_0[mass][twist] = F0                    
                     qSq[mass][twist] = qsq                    
@@ -148,8 +161,7 @@ def make_fs(Fit):
                     A = Fit['M_G_m{0}'.format(mass)] + Fit['E_D_tw{0}'.format(twist)]
                     B = (Fit['M_G_m{0}'.format(mass)]**2 - Fit['M_D_tw{0}'.format(twist)]**2)*(Fit['M_G_m{0}'.format(mass)] - Fit['E_D_tw{0}'.format(twist)])/qsq           
                     if twist != '0':
-                        F_plus[mass][twist] = (1/(A-B))*(Z_v*Fit['Vm{0}_tw{1}'.format(mass,twist)] - B*F0)       
-        
+                        F_plus[mass][twist] = (1/(A-B))*(Z_v*Fit['Vm{0}_tw{1}'.format(mass,twist)] - B*F0)
     
     return(F_0,F_plus,qSq,Z)
 
@@ -170,8 +182,9 @@ def main():
     x = MetacPhys*gv.gvar('0.1438(4)')/2   #GeV
     datatags = []
     prior['Metacphys'] = MetacPhys
+    LQCD = collections.OrderedDict()
     for Fit in Fits:
-        prior['LQCD_{0}'.format(Fit['conf'])] = 0.5*Fit['a']
+        LQCD['{0}'.format(Fit['conf'])] = 0.5*(Fit['a'].mean)
         #print(gv.evalcorr([prior['LQCD_{0}'.format(Fit['conf'])],Fit['a']]))
         F_0,F_plus,qSq,Z = make_fs(Fit)
         if Fit == F:
@@ -232,6 +245,7 @@ def main():
             #print(datatags)
             for datatag in datatags:
                 fit = datatag.split('_')[0]
+                #fitdict = locals()[datatag.split('_')[0]]
                 mass = datatag.split('_')[1].strip('m')
                 twist = datatag.split('_')[2].strip('tw')
                 if '0{0}'.format(datatag) in f:
@@ -244,14 +258,14 @@ def main():
                             for k in range(3):
                                 if AddRho == True: 
                                     if '0{0}'.format(datatag) in f:
-                                        models['0{0}'.format(datatag)] += (1/(1-(p['qsq_{0}_m{1}_tw{2}'.format(fit,mass,twist)]/(p['MHs0_{0}_m{1}'.format(fit,mass)])**2))) * (p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)])**n * (1 + p['0rho'][n]*gv.log(p['MHh_{0}_m{1}'.format(fit,mass)]/p['MHc_{0}'.format(fit)])) * (1 + (p['0csval'][n]*p['deltasval_{0}'.format(fit)] + p['0cs'][n]*p['deltas_{0}'.format(fit)] + 2*p['0cl'][n]*p['deltal_{0}'.format(fit)])/(10*p['mstuned_{0}'.format(fit)]) + p['0cc'][n]*((p['Metac_{0}'.format(fit)] - p['Metacphys'])/p['Metacphys'])) * p['0d'][i][j][k][n] * (p['LQCD_{0}'.format(fit)]/p['MHh_{0}_m{1}'.format(fit,mass)])**int(i) * (mh0val['{0}_m{1}'.format(fit,mass)]/np.pi)**int(2*j) * (p['Eetas_{0}_tw{1}'.format(fit,twist)]/np.pi)**int(2*k)
+                                        models['0{0}'.format(datatag)] += (1/(1-(p['qsq_{0}_m{1}_tw{2}'.format(fit,mass,twist)]/(p['MHs0_{0}_m{1}'.format(fit,mass)])**2))) * (p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)])**n * (1 + p['0rho'][n]*gv.log(p['MHh_{0}_m{1}'.format(fit,mass)]/p['MHc_{0}'.format(fit)])) * (1 + (p['0csval'][n]*p['deltasval_{0}'.format(fit)] + p['0cs'][n]*p['deltas_{0}'.format(fit)] + 2*p['0cl'][n]*p['deltal_{0}'.format(fit)])/(10*p['mstuned_{0}'.format(fit)]) + p['0cc'][n]*((p['Metac_{0}'.format(fit)] - p['Metacphys'])/p['Metacphys'])) * p['0d'][i][j][k][n] * (LQCD['{0}'.format(fit)]/p['MHh_{0}_m{1}'.format(fit,mass)])**int(i) * (mh0val['{0}_m{1}'.format(fit,mass)]/np.pi)**int(2*j) * (p['Eetas_{0}_tw{1}'.format(fit,twist)]/np.pi)**int(2*k)
                                     if 'plus{0}'.format(datatag) in f:                                       
-                                        models['plus{0}'.format(datatag)] += (1/(1-p['qsq_{0}_m{1}_tw{2}'.format(fit,mass,twist)]/p['MHsstar_{0}_m{1}'.format(fit,mass)]**2)) * ( p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)]**n - (n/N) * (-1)**(n-N) * p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)]**N)* (1 + p['plusrho'][n]*gv.log(p['MHh_{0}_m{1}'.format(fit,mass)]/p['MHc_{0}'.format(fit)])) * (1 + (p['pluscsval'][n]*p['deltasval_{0}'.format(fit)] + p['pluscs'][n]*p['deltas_{0}'.format(fit)] + 2*p['pluscl'][n]*p['deltal_{0}'.format(fit)])/(10*p['mstuned_{0}'.format(fit)]) + p['pluscc'][n]*((p['Metac_{0}'.format(fit)] - p['Metacphys'])/p['Metacphys'])) * p['plusd'][i][j][k][n] * (p['LQCD_{0}'.format(fit)]/p['MHh_{0}_m{1}'.format(fit,mass)])**int(i) * (mh0val['{0}_m{1}'.format(fit,mass)]/np.pi)**int(2*j) * (p['Eetas_{0}_tw{1}'.format(fit,twist)]/np.pi)**int(2*k)
+                                        models['plus{0}'.format(datatag)] += (1/(1-p['qsq_{0}_m{1}_tw{2}'.format(fit,mass,twist)]/p['MHsstar_{0}_m{1}'.format(fit,mass)]**2)) * ( p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)]**n - (n/N) * (-1)**(n-N) * p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)]**N)* (1 + p['plusrho'][n]*gv.log(p['MHh_{0}_m{1}'.format(fit,mass)]/p['MHc_{0}'.format(fit)])) * (1 + (p['pluscsval'][n]*p['deltasval_{0}'.format(fit)] + p['pluscs'][n]*p['deltas_{0}'.format(fit)] + 2*p['pluscl'][n]*p['deltal_{0}'.format(fit)])/(10*p['mstuned_{0}'.format(fit)]) + p['pluscc'][n]*((p['Metac_{0}'.format(fit)] - p['Metacphys'])/p['Metacphys'])) * p['plusd'][i][j][k][n] * (LQCD['{0}'.format(fit)]/p['MHh_{0}_m{1}'.format(fit,mass)])**int(i) * (mh0val['{0}_m{1}'.format(fit,mass)]/np.pi)**int(2*j) * (p['Eetas_{0}_tw{1}'.format(fit,twist)]/np.pi)**int(2*k)
                                 else:
                                     if '0{0}'.format(datatag) in f:
-                                        models['0{0}'.format(datatag)] += (1/(1-(p['qsq_{0}_m{1}_tw{2}'.format(fit,mass,twist)]/(p['MHs0_{0}_m{1}'.format(fit,mass)])**2))) * (p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)])**n * (1 + (p['0csval'][n]*p['deltasval_{0}'.format(fit)] + p['0cs'][n]*p['deltas_{0}'.format(fit)] + 2*p['0cl'][n]*p['deltal_{0}'.format(fit)])/(10*p['mstuned_{0}'.format(fit)]) + p['0cc'][n]*((p['Metac_{0}'.format(fit)] - p['Metacphys'])/p['Metacphys'])) * p['0d'][i][j][k][n] * (p['LQCD_{0}'.format(fit)]/p['MHh_{0}_m{1}'.format(fit,mass)])**int(i) * (mh0val['{0}_m{1}'.format(fit,mass)]/np.pi)**int(2*j) * (p['Eetas_{0}_tw{1}'.format(fit,twist)]/np.pi)**int(2*k)
+                                        models['0{0}'.format(datatag)] += (1/(1-(p['qsq_{0}_m{1}_tw{2}'.format(fit,mass,twist)]/(p['MHs0_{0}_m{1}'.format(fit,mass)])**2))) * (p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)])**n * (1 + (p['0csval'][n]*p['deltasval_{0}'.format(fit)] + p['0cs'][n]*p['deltas_{0}'.format(fit)] + 2*p['0cl'][n]*p['deltal_{0}'.format(fit)])/(10*p['mstuned_{0}'.format(fit)]) + p['0cc'][n]*((p['Metac_{0}'.format(fit)] - p['Metacphys'])/p['Metacphys'])) * p['0d'][i][j][k][n] * (LQCD['{0}'.format(fit)]/p['MHh_{0}_m{1}'.format(fit,mass)])**int(i) * (mh0val['{0}_m{1}'.format(fit,mass)]/np.pi)**int(2*j) * (p['Eetas_{0}_tw{1}'.format(fit,twist)]/np.pi)**int(2*k)
                                     if 'plus{0}'.format(datatag) in f:                                       
-                                        models['plus{0}'.format(datatag)] += (1/(1-p['qsq_{0}_m{1}_tw{2}'.format(fit,mass,twist)]/p['MHsstar_{0}_m{1}'.format(fit,mass)]**2)) * ( p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)]**n - (n/N) * (-1)**(n-N) * p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)]**N) * (1 + (p['pluscsval'][n]*p['deltasval_{0}'.format(fit)] + p['pluscs'][n]*p['deltas_{0}'.format(fit)] + 2*p['pluscl'][n]*p['deltal_{0}'.format(fit)])/(10*p['mstuned_{0}'.format(fit)]) + p['pluscc'][n]*((p['Metac_{0}'.format(fit)] - p['Metacphys'])/p['Metacphys'])) * p['plusd'][i][j][k][n] * (p['LQCD_{0}'.format(fit)]/p['MHh_{0}_m{1}'.format(fit,mass)])**int(i) * (mh0val['{0}_m{1}'.format(fit,mass)]/np.pi)**int(2*j) * (p['Eetas_{0}_tw{1}'.format(fit,twist)]/np.pi)**int(2*k)
+                                        models['plus{0}'.format(datatag)] += (1/(1-p['qsq_{0}_m{1}_tw{2}'.format(fit,mass,twist)]/p['MHsstar_{0}_m{1}'.format(fit,mass)]**2)) * ( p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)]**n - (n/N) * (-1)**(n-N) * p['z_{0}_m{1}_tw{2}'.format(fit,mass,twist)]**N) * (1 + (p['pluscsval'][n]*p['deltasval_{0}'.format(fit)] + p['pluscs'][n]*p['deltas_{0}'.format(fit)] + 2*p['pluscl'][n]*p['deltal_{0}'.format(fit)])/(10*p['mstuned_{0}'.format(fit)]) + p['pluscc'][n]*((p['Metac_{0}'.format(fit)] - p['Metacphys'])/p['Metacphys'])) * p['plusd'][i][j][k][n] * (LQCD['{0}'.format(fit)]/p['MHh_{0}_m{1}'.format(fit,mass)])**int(i) * (mh0val['{0}_m{1}'.format(fit,mass)]/np.pi)**int(2*j) * (p['Eetas_{0}_tw{1}'.format(fit,twist)]/np.pi)**int(2*k)
                                                                                                 
                             
             return(models)
@@ -508,8 +522,15 @@ def plot_results(Metasphys,p,x,prior,f):
     qsq = np.linspace(0,qsqmax.mean,nopts)
     #print('qsq',qsq)
     #p['LQCD'] = 0.5
-    p['LQCD'] = p['LQCD_F']/F['a']
+    #if F in Fits:
+    #    p['LQCD'] = p['LQCD_F']/F['a']
+    #elif SF in Fits:
+    #    p['LQCD'] = p['LQCD_SF']/SF['a']
+    #elif UF in Fits:
+    #    p['LQCD'] = p['LQCD_UF']/UF['a']
+    #print(p['LQCD'])    
     #print(gv.evalcorr([p['LQCD'],F['a']]))
+    p['LQCD'] = 0.5
     plt.figure(3)
     
     for j in range(len(qsq)):
@@ -545,6 +566,7 @@ def plot_results(Metasphys,p,x,prior,f):
                 fplusphys += (Z[j]**n - (n/N) * (-1)**(n-N) * Z[j]**N) * a['plus'][n]
         if qsq[j] == 0.0:
             print('f_0(0):',f0physpole)
+            print('f_+(0)/f_0(0):',fplusphyspole/f0physpole)
             if AddRho:               
                 inputs = {'d0000':prior['0d'][0][0][0][0],'d1000':prior['0d'][1][0][0][0],'d1000':prior['0d'][1][0][0][0],'d2000':prior['0d'][2][0][0][0],'d0001':prior['0d'][0][0][0][1],'d1001':prior['0d'][1][0][0][1],'d1001':prior['0d'][1][0][0][1],'d2001':prior['0d'][2][0][0][1],'d0002':prior['0d'][0][0][0][2],'d1002':prior['0d'][1][0][0][2],'d1002':prior['0d'][1][0][0][2],'d2002':prior['0d'][2][0][0][2],'rho0':prior['0rho'][0],'rho1':prior['0rho'][1],'rho2':prior['0rho'][2],'data':f}
                 
